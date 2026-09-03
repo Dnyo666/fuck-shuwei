@@ -20,58 +20,90 @@
       </div>
     </div>
 
-    <n-modal v-model:show="lessonsConfigOpen">
-      <n-card size="large" :bordered="false" :style="{ width: '720px', maxWidth: '94vw' }">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <div class="text-base font-semibold">配置课程列表</div>
-            <div class="mt-1 text-xs text-slate-600">必须是课程序号，从上到下优先级递减</div>
+    <n-modal
+      v-model:show="lessonsConfigOpen"
+      preset="card"
+      title="配置课程列表"
+      :bordered="false"
+      :trap-focus="false"
+      :auto-focus="false"
+      :block-scroll="false"
+      style="width: 980px; max-width: 96vw"
+    >
+      <div class="text-xs text-slate-600 -mt-2 mb-4">
+        从当前轮次课程里点选，或手填课程序号 / 课程 ID。上到下为优先级。
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="rounded-2xl border border-black/10 bg-white/60 p-3 min-h-[420px] flex flex-col">
+          <div class="flex flex-wrap items-center gap-2">
+            <n-input v-model:value="catalogQuery" size="small" clearable placeholder="搜索名称 / 序号 / ID / 教师" />
+            <n-button size="small" secondary :disabled="ws.processing" @click="fetchProfilesCourse()">
+              拉取课程
+            </n-button>
           </div>
-          <n-button secondary size="small" @click="lessonsConfigOpen = false">关闭</n-button>
-        </div>
-
-        <div class="mt-4 overflow-hidden rounded-2xl bg-white/60">
-          <n-scrollbar class="h-[420px]">
-            <div class="p-2 space-y-2">
-              <div
-                v-for="(_, idx) in session.lessonsText"
-                :key="idx"
-                class="rounded-xl border border-black/10 bg-white/70 px-2 py-2"
-              >
-                <div class="flex flex-wrap items-center gap-2">
-                  <div class="min-w-[180px] flex-1">
-                    <n-input v-model:value="session.lessonsText[idx]" size="small" placeholder="课程序号（如 001.1.1）" />
-                  </div>
-                  <div class="flex items-center gap-1 shrink-0">
-                    <n-button size="tiny" secondary :disabled="idx === 0" @click="moveLessonUp(idx)">上移</n-button>
-                    <n-button
-                      size="tiny"
-                      secondary
-                      :disabled="idx >= session.lessonsText.length - 1"
-                      @click="moveLessonDown(idx)"
-                    >
-                      下移
-                    </n-button>
-                    <n-button size="tiny" type="error" secondary @click="deleteLesson(idx)">删除</n-button>
-                  </div>
-                </div>
-              </div>
-
-              <div v-if="session.lessonsText.length === 0" class="py-10 text-center text-sm text-slate-500">
-                还没有添加课程
-              </div>
-
+          <div class="mt-2 text-[11px] text-slate-500">当前轮次可选 {{ filteredCatalog.length }} / {{ catalogLessons.length }} 门</div>
+          <n-scrollbar class="mt-2 flex-1 min-h-0">
+            <div class="space-y-2 pr-1">
               <button
+                v-for="item in filteredCatalog"
+                :key="catalogKey(item)"
                 type="button"
-                class="w-full rounded-xl border border-dashed border-black/15 bg-white/40 px-3 py-2 text-sm text-slate-600 hover:bg-white/60"
-                @click="addLesson()"
+                class="w-full text-left rounded-xl border border-black/10 bg-white/80 px-3 py-2 hover:bg-white"
+                @click="addLessonFromCatalog(item)"
               >
-                点击添加
+                <div class="text-sm font-medium text-slate-900">{{ item.name || item.no || item.id }}</div>
+                <div class="mt-1 text-[11px] text-slate-500">
+                  {{ item.no || item.id }}
+                  <span v-if="item.teachers"> · {{ item.teachers }}</span>
+                  <span v-if="item.courseTypeName"> · {{ item.courseTypeName }}</span>
+                  <span v-if="item.teachClassName"> · {{ item.teachClassName }}</span>
+                </div>
               </button>
+              <div v-if="catalogLessons.length === 0" class="py-10 text-center text-sm text-slate-500">
+                还没有课程缓存。选好轮次后点「拉取课程」。
+              </div>
+              <div v-else-if="filteredCatalog.length === 0" class="py-10 text-center text-sm text-slate-500">
+                没有匹配的课程
+              </div>
             </div>
           </n-scrollbar>
         </div>
-      </n-card>
+
+        <div class="rounded-2xl border border-black/10 bg-white/60 p-3 min-h-[420px] flex flex-col">
+          <div class="flex flex-wrap items-center gap-2">
+            <n-input v-model:value="manualLesson" size="small" placeholder="手填课程序号或 ID，例如 F302159.01" @keyup.enter="addManualLesson" />
+            <n-button size="small" type="primary" @click="addManualLesson">添加</n-button>
+          </div>
+          <div class="mt-2 text-[11px] text-slate-500">已选 {{ session.lessonsText.length }} 门</div>
+          <n-scrollbar class="mt-2 flex-1 min-h-0">
+            <div class="space-y-2 pr-1">
+              <div
+                v-for="(value, idx) in session.lessonsText"
+                :key="`${idx}-${value}`"
+                class="rounded-xl border border-black/10 bg-white/80 px-3 py-2"
+              >
+                <n-input v-model:value="session.lessonsText[idx]" size="small" placeholder="课程序号或 ID" />
+                <div class="mt-1 text-[11px] text-slate-500">{{ lessonHint(value) }}</div>
+                <div class="mt-2 flex items-center gap-1">
+                  <n-button size="tiny" secondary :disabled="idx === 0" @click="moveLessonUp(idx)">上移</n-button>
+                  <n-button
+                    size="tiny"
+                    secondary
+                    :disabled="idx >= session.lessonsText.length - 1"
+                    @click="moveLessonDown(idx)"
+                  >
+                    下移
+                  </n-button>
+                  <n-button size="tiny" type="error" secondary @click="deleteLesson(idx)">删除</n-button>
+                </div>
+              </div>
+              <div v-if="session.lessonsText.length === 0" class="py-10 text-center text-sm text-slate-500">
+                还没有添加课程
+              </div>
+            </div>
+          </n-scrollbar>
+        </div>
+      </div>
     </n-modal>
 
     <n-modal v-model:show="resultsModalOpen" :mask-closable="false" :style="{ padding: '0px' }">
@@ -110,20 +142,29 @@
         <n-card>
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
-              <div class="text-sm font-semibold">选课轮次（兼容模式）</div>
-              <div class="mt-1 text-xs text-slate-600">轮次 N = 教务选课页面从上到下第 N 个选课轮次</div>
+              <div class="text-sm font-semibold">选课轮次</div>
+              <div class="mt-1 text-xs text-slate-600">专业选修、美育、公共任选等都会列出来，按教务页从上到下的全部轮次</div>
             </div>
             <div class="flex flex-wrap items-center gap-3">
               <n-select
-                v-model:value="session.courseCount"
+                :value="session.courseProfileId || null"
                 size="small"
-                class="w-[240px]"
+                class="w-[360px]"
                 :options="profileOptions"
-                placeholder="轮次（1-5）"
+                placeholder="先刷新轮次"
                 :disabled="ws.processing"
+                @update:value="setCourseProfile"
               />
               <n-button size="small" secondary :disabled="ws.processing" @click="fetchProfilesCourse()">刷新轮次</n-button>
             </div>
+          </div>
+          <div v-if="activeProfile" class="mt-3 text-xs text-slate-600 leading-relaxed">
+            <n-tag size="small" :bordered="false" :type="activeProfile.open ? 'success' : 'warning'">
+              {{ activeProfile.category || '选课' }}
+            </n-tag>
+            <span class="ml-2">{{ activeProfile.open ? '已开放' : '未到开放时间' }}</span>
+            <span v-if="activeProfile.openTime" class="ml-2">选课 {{ activeProfile.openTime }}</span>
+            <div v-if="activeProfile.notice" class="mt-1">{{ activeProfile.notice }}</div>
           </div>
         </n-card>
 
@@ -161,7 +202,7 @@
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="text-sm font-semibold">课程列表</div>
-              <div class="mt-1 text-xs text-slate-600">共 {{ session.lessonsText.length }} 条（必须是课程序号）</div>
+              <div class="mt-1 text-xs text-slate-600">共 {{ session.lessonsText.length }} 条，可从课程列表点选或手填序号 / ID</div>
             </div>
             <n-button size="small" secondary @click="lessonsConfigOpen = true">配置</n-button>
           </div>
@@ -180,6 +221,7 @@ import { useMessage, NAlert, NButton, NCard, NDataTable, NForm, NFormItemGi, NGr
 import { useCourseStore } from '@/stores/course'
 import { usePersistedStore } from '@/stores/persisted'
 import { useWsStore } from '@/stores/ws'
+import { findLessonInCache, normalizeLessonJSONs } from '@/shared/utils'
 
 const persisted = usePersistedStore()
 const ws = useWsStore()
@@ -194,19 +236,45 @@ function goSessions() {
 const lessonsConfigOpen = ref(false)
 const resultsModalOpen = ref(false)
 const courseStarted = ref(false)
+const catalogQuery = ref('')
+const manualLesson = ref('')
 
-const profileOptions = computed(() => {
-  const list = Array.isArray(session.value?.electionProfiles) ? session.value.electionProfiles : []
-  if (list.length > 0) {
-    return list.map((p, idx) => ({
-      label: p.title || `轮次 ${idx + 1}`,
-      value: String(idx + 1),
-    }))
-  }
-  return Array.from({ length: 5 }, (_, idx) => ({
-    label: `轮次 ${idx + 1}`,
-    value: String(idx + 1),
-  }))
+const profileList = computed(() => (
+  Array.isArray(session.value?.electionProfiles) ? session.value.electionProfiles : []
+))
+
+const profileOptions = computed(() =>
+  profileList.value.map((item) => {
+    const title = String(item.title || '').replace(/^\d{4}-\d{4}学年\S*\s*/, '')
+    const state = item.open ? '已开放' : (item.openTime || '未开放')
+    return {
+      label: `${item.category || '选课'} · ${title || item.id} · ${state}`,
+      value: String(item.id),
+    }
+  }),
+)
+
+const activeProfile = computed(() => {
+  const id = String(session.value?.courseProfileId || '')
+  return profileList.value.find((item) => String(item.id) === id) || null
+})
+
+const catalogLessons = computed(() => {
+  const id = String(session.value?.courseProfileId || '')
+  const cache = session.value?.lessonJSONsCache || {}
+  return normalizeLessonJSONs(id ? cache[id] : null)
+})
+
+const filteredCatalog = computed(() => {
+  const q = catalogQuery.value.trim().toLowerCase()
+  if (!q) return catalogLessons.value
+  return catalogLessons.value.filter((item) => {
+    const text = [item?.no, item?.id, item?.code, item?.name, item?.teachers, item?.teachClassName, item?.courseTypeName]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return text.includes(q)
+  })
 })
 
 const lessonsPreview = computed(() => {
@@ -252,14 +320,48 @@ const columns = [
   },
 ]
 
-function addLesson() {
+function catalogKey(item) {
+  return [item?.id, item?.no, item?.code, item?.name].filter(Boolean).join('|')
+}
+
+function lessonHint(value) {
+  const hit = findLessonInCache(catalogLessons.value, value)
+  if (!hit) return '手填项，开始选课时按序号或 ID 匹配'
+  return [hit.name, hit.teachers, hit.courseTypeName, hit.teachClassName].filter(Boolean).join(' · ')
+}
+
+function setCourseProfile(id) {
   const current = session.value
   if (!current) return
-  const list = Array.isArray(current.lessonsText) ? current.lessonsText : []
-  const last = list.length ? String(list[list.length - 1] || '').trim() : ''
-  if (list.length > 0 && last === '') return
-  list.push('')
-  current.lessonsText = list
+  current.courseProfileId = String(id || '')
+  const idx = profileList.value.findIndex((item) => String(item.id) === current.courseProfileId)
+  if (idx >= 0) current.courseCount = String(idx + 1)
+}
+
+function addLessonValue(raw) {
+  const current = session.value
+  if (!current) return false
+  const value = String(raw || '').trim()
+  if (!value) return false
+  const list = Array.isArray(current.lessonsText) ? current.lessonsText.map((item) => String(item)) : []
+  if (list.some((item) => item.trim() === value)) {
+    message.warning('已经在列表里了')
+    return false
+  }
+  current.lessonsText = [...list, value]
+  return true
+}
+
+function addLessonFromCatalog(item) {
+  const value = String(item?.no || item?.id || '').trim()
+  if (!value) return
+  if (addLessonValue(value)) message.success(`已加入 ${item.name || value}`)
+}
+
+function addManualLesson() {
+  if (addLessonValue(manualLesson.value)) {
+    manualLesson.value = ''
+  }
 }
 
 function moveLessonUp(idx) {
@@ -320,5 +422,21 @@ watch(
       if (course.courseTable.length > 0) resultsModalOpen.value = true
     }
   },
+)
+
+watch(
+  () => profileList.value.map((item) => item.id).join(','),
+  () => {
+    const current = session.value
+    if (!current || profileList.value.length === 0) return
+    if (current.courseProfileId && profileList.value.some((item) => String(item.id) === current.courseProfileId)) {
+      const idx = profileList.value.findIndex((item) => String(item.id) === current.courseProfileId)
+      if (idx >= 0) current.courseCount = String(idx + 1)
+      return
+    }
+    const fromCount = profileList.value[Math.max(0, Number(current.courseCount || 1) - 1)]
+    setCourseProfile((fromCount || profileList.value[0]).id)
+  },
+  { immediate: true },
 )
 </script>

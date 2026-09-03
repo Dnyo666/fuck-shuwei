@@ -21,6 +21,7 @@ export function createEmptySession(partial) {
     cookie: typeof v.cookie === 'string' ? v.cookie : '',
     loginPath: typeof v.loginPath === 'string' && v.loginPath ? v.loginPath : '/eams/loginExt.action',
     courseCount: typeof v.courseCount === 'string' ? v.courseCount : '1',
+    courseProfileId: typeof v.courseProfileId === 'string' ? v.courseProfileId : '',
     scheduleCount: typeof v.scheduleCount === 'string' ? v.scheduleCount : '1',
     selectionModel: typeof v.selectionModel === 'string' ? v.selectionModel : '2',
     lessonsText: Array.isArray(v.lessonsText) ? v.lessonsText.map((x) => String(x)) : [],

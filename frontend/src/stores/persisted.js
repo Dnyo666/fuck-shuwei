@@ -227,9 +227,16 @@ export const usePersistedStore = defineStore('persisted', {
     },
     buildCourseBaseConfig() {
       const session = this.activeSession
+      const profiles = Array.isArray(session?.electionProfiles) ? session.electionProfiles : []
+      const profileId = String(session?.courseProfileId || '').trim()
+      const matched = profiles.find((item) => String(item?.id || '') === profileId)
+      const index = matched
+        ? profiles.findIndex((item) => String(item?.id || '') === profileId)
+        : Math.max(0, Number(session?.courseCount || 1) - 1)
       return {
         ...this.buildCommonBaseConfig(),
-        count: session?.courseCount || '1',
+        count: String(index + 1),
+        profileId: matched?.id || profileId,
       }
     },
     buildScheduleBaseConfig() {

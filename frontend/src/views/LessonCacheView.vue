@@ -69,10 +69,12 @@
 
 <script setup>
 import { computed, h, ref, watch } from 'vue'
-import { NButton, NCard, NDataTable, NInput, NModal, NScrollbar, NSelect, NTabPane, NTabs } from 'naive-ui'
+import { useMessage, NButton, NCard, NDataTable, NInput, NModal, NScrollbar, NSelect, NTabPane, NTabs } from 'naive-ui'
 import { usePersistedStore } from '@/stores/persisted'
+import { normalizeLessonJSONs } from '@/shared/utils'
 
 const store = usePersistedStore()
+const message = useMessage()
 const selectedProfileId = ref('')
 const query = ref('')
 const session = computed(() => store.activeSession)
@@ -82,7 +84,8 @@ const profileOptions = computed(() => profileIds.value.map((id) => ({ label: id,
 
 const currentRaw = computed(() => {
   if (!selectedProfileId.value) return null
-  return session.value?.lessonJSONsCache?.[selectedProfileId.value] ?? null
+  const raw = session.value?.lessonJSONsCache?.[selectedProfileId.value] ?? null
+  return typeof raw === 'string' ? tryParseJson(raw) : raw
 })
 
 const currentJson = computed(() => {
@@ -93,17 +96,6 @@ const currentJson = computed(() => {
   if (list.length > 0) return `课程列表较大，已跳过自动格式化。当前轮次共 ${list.length} 条；需要查看单条原文请在表格点“详情”。`
   return '课程缓存较大，已跳过自动格式化。'
 })
-
-function normalizeLessonJSONs(raw) {
-  const v = typeof raw === 'string' ? tryParseJson(raw) : raw
-  if (Array.isArray(v)) return v
-  if (v && typeof v === 'object') {
-    if (Array.isArray(v.lessonJSONs)) return v.lessonJSONs
-    if (Array.isArray(v.lessonJSONsList)) return v.lessonJSONsList
-    if (Array.isArray(v.data)) return v.data
-  }
-  return []
-}
 
 function tryParseJson(s) {
   try {
@@ -179,6 +171,24 @@ function rowKey(row) {
   return fallbackRowKeys.get(row)
 }
 
+function addToCourse(row) {
+  const current = session.value
+  if (!current) {
+    message.warning('请先选择学生会话')
+    return
+  }
+  const value = String(row?.no || row?.id || '').trim()
+  if (!value) return
+  const list = Array.isArray(current.lessonsText) ? current.lessonsText.map((item) => String(item)) : []
+  if (list.some((item) => item.trim() === value)) {
+    message.warning('已经在选课列表里了')
+    return
+  }
+  current.lessonsText = [...list, value]
+  if (selectedProfileId.value) current.courseProfileId = String(selectedProfileId.value)
+  message.success(`已加入 ${row?.name || value}`)
+}
+
 function openDetail(row) {
   try {
     detailTitle.value = [row?.no, row?.name, row?.teachers].filter(Boolean).join(' · ') || '原始数据'
@@ -221,13 +231,12 @@ const columns = [
   {
     title: '操作',
     key: '_actions',
-    width: 90,
+    width: 160,
     render(row) {
-      return h(
-        NButton,
-        { size: 'tiny', secondary: true, onClick: () => openDetail(row) },
-        { default: () => '详情' },
-      )
+      return h('div', { class: 'flex items-center gap-1' }, [
+        h(NButton, { size: 'tiny', secondary: true, onClick: () => addToCourse(row) }, { default: () => '加入选课' }),
+        h(NButton, { size: 'tiny', secondary: true, onClick: () => openDetail(row) }, { default: () => '详情' }),
+      ])
     },
   },
 ]

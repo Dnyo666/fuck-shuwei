@@ -2,8 +2,12 @@ module.exports = function getLessonId(config) {
   try {
     const lessonNumbers = config.lessons
     const result = lessonNumbers.map((no) => {
-      const trimmedNo = no.value.trim()
-      const match = config.lessonJSONs.find((l) => l.no === trimmedNo)
+      const trimmedNo = String(no.value || '').trim()
+      const list = Array.isArray(config.lessonJSONs) ? config.lessonJSONs : []
+      const match =
+        list.find((l) => String(l.no || '') === trimmedNo) ||
+        list.find((l) => String(l.id || '') === trimmedNo) ||
+        list.find((l) => String(l.code || '') === trimmedNo)
 
       if (!match) {
         return {

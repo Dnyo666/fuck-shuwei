@@ -29,6 +29,28 @@ export function hostLabel(url) {
 
 const COOKIE_ATTRS = new Set(['expires', 'path', 'domain', 'secure', 'httponly', 'samesite', 'max-age'])
 
+export function findLessonInCache(list, key) {
+  const token = String(key || '').trim()
+  if (!token || !Array.isArray(list)) return null
+  return (
+    list.find((item) => String(item?.no || '') === token) ||
+    list.find((item) => String(item?.id || '') === token) ||
+    list.find((item) => String(item?.code || '') === token) ||
+    null
+  )
+}
+
+export function normalizeLessonJSONs(raw) {
+  const value = raw
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value.lessonJSONs)) return value.lessonJSONs
+    if (Array.isArray(value.lessonJSONsList)) return value.lessonJSONsList
+    if (Array.isArray(value.data)) return value.data
+  }
+  return []
+}
+
 export function parseCookieInput(raw) {
   const text = String(raw || '')
     .replace(/^Cookie:\s*/i, '')
