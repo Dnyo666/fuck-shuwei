@@ -6,7 +6,7 @@ module.exports = async function getProfileId(config) {
     const rawCount = config.count === undefined || config.count === null ? '' : String(config.count).trim()
     const count = parseInt(rawCount) || 1
 
-    let result = await visit('/eams/stdElectCourse!innerIndex.action', config.cookie)
+    let result = await visit('/eams/stdElectCourse!innerIndex.action', config.cookie, config.request)
 
     if (!result) {
       throw new Error('初始页面失败')

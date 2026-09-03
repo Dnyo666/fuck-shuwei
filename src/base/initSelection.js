@@ -4,7 +4,7 @@ module.exports = async function initSelection(config) {
   const initUrl = `/eams/stdElectCourse!defaultPage.action?electionProfile.id=${config.profileId}`
 
   try {
-    const res = await visit(initUrl, config.cookie)
+    const res = await visit(initUrl, config.cookie, config.request)
     if (!res) {
       throw new Error('选课初始化失败')
     }

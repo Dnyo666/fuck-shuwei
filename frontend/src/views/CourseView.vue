@@ -1,5 +1,12 @@
 <template>
-  <div class="h-full flex flex-col gap-5">
+  <div v-if="!session" class="h-full flex items-center justify-center">
+    <n-card class="max-w-md text-center">
+      <div class="text-base font-semibold">还没有当前会话</div>
+      <div class="mt-2 text-sm text-slate-600">先到会话页登录或导入 Cookie，再开始选课。</div>
+      <n-button class="mt-4" type="primary" @click="goSessions">前往会话</n-button>
+    </n-card>
+  </div>
+  <div v-else class="h-full flex flex-col gap-5">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div class="text-xl font-semibold tracking-wide">智能选课</div>
@@ -27,20 +34,20 @@
           <n-scrollbar class="h-[420px]">
             <div class="p-2 space-y-2">
               <div
-                v-for="(_, idx) in persisted.form.lessonsText"
+                v-for="(_, idx) in session.lessonsText"
                 :key="idx"
                 class="rounded-xl border border-black/10 bg-white/70 px-2 py-2"
               >
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="min-w-[180px] flex-1">
-                    <n-input v-model:value="persisted.form.lessonsText[idx]" size="small" placeholder="课程序号（如 001.1.1）" />
+                    <n-input v-model:value="session.lessonsText[idx]" size="small" placeholder="课程序号（如 001.1.1）" />
                   </div>
                   <div class="flex items-center gap-1 shrink-0">
                     <n-button size="tiny" secondary :disabled="idx === 0" @click="moveLessonUp(idx)">上移</n-button>
                     <n-button
                       size="tiny"
                       secondary
-                      :disabled="idx >= persisted.form.lessonsText.length - 1"
+                      :disabled="idx >= session.lessonsText.length - 1"
                       @click="moveLessonDown(idx)"
                     >
                       下移
@@ -50,7 +57,7 @@
                 </div>
               </div>
 
-              <div v-if="persisted.form.lessonsText.length === 0" class="py-10 text-center text-sm text-slate-500">
+              <div v-if="session.lessonsText.length === 0" class="py-10 text-center text-sm text-slate-500">
                 还没有添加课程
               </div>
 
@@ -108,7 +115,7 @@
             </div>
             <div class="flex flex-wrap items-center gap-3">
               <n-select
-                v-model:value="persisted.form.courseCount"
+                v-model:value="session.courseCount"
                 size="small"
                 class="w-[240px]"
                 :options="profileOptions"
@@ -121,15 +128,15 @@
         </n-card>
 
         <n-card>
-          <n-form :model="persisted.form" label-placement="top" size="large">
+          <n-form :model="session" label-placement="top" size="large">
             <n-grid :cols="12" :x-gap="16" :y-gap="14">
               <n-form-item-gi :span="12" label="抢课模式">
                 <div class="w-full space-y-3">
-                  <n-radio-group v-model:value="persisted.form.selectionModel" class="flex items-center gap-4">
+                  <n-radio-group v-model:value="session.selectionModel" class="flex items-center gap-4">
                     <n-radio value="2">顺序</n-radio>
                     <n-radio value="1">并发</n-radio>
                   </n-radio-group>
-                  <n-alert v-if="persisted.form.selectionModel === '1'" type="warning" :bordered="false">
+                  <n-alert v-if="session.selectionModel === '1'" type="warning" :bordered="false">
                     并发模式更快但更激进，容易触发系统限制或异常状态。
                   </n-alert>
                 </div>
@@ -140,7 +147,7 @@
                   <div class="text-sm text-slate-700">当存在未成功课程时，自动再次执行</div>
                   <div class="flex items-center gap-3">
                     <n-tag :bordered="false" type="info">
-                      课程数 {{ persisted.form.lessonsText.length }}
+                      课程数 {{ session.lessonsText.length }}
                     </n-tag>
                     <n-switch v-model:value="persisted.courseLoop" />
                   </div>
@@ -154,7 +161,7 @@
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="text-sm font-semibold">课程列表</div>
-              <div class="mt-1 text-xs text-slate-600">共 {{ persisted.form.lessonsText.length }} 条（必须是课程序号）</div>
+              <div class="mt-1 text-xs text-slate-600">共 {{ session.lessonsText.length }} 条（必须是课程序号）</div>
             </div>
             <n-button size="small" secondary @click="lessonsConfigOpen = true">配置</n-button>
           </div>
@@ -168,7 +175,8 @@
 
 <script setup>
 import { computed, h, ref, watch } from 'vue'
-import { NAlert, NButton, NCard, NDataTable, NForm, NFormItemGi, NGrid, NInput, NModal, NRadio, NRadioGroup, NScrollbar, NSelect, NSwitch, NTag } from 'naive-ui'
+import { useRouter } from 'vue-router'
+import { useMessage, NAlert, NButton, NCard, NDataTable, NForm, NFormItemGi, NGrid, NInput, NModal, NRadio, NRadioGroup, NScrollbar, NSelect, NSwitch, NTag } from 'naive-ui'
 import { useCourseStore } from '@/stores/course'
 import { usePersistedStore } from '@/stores/persisted'
 import { useWsStore } from '@/stores/ws'
@@ -176,12 +184,19 @@ import { useWsStore } from '@/stores/ws'
 const persisted = usePersistedStore()
 const ws = useWsStore()
 const course = useCourseStore()
+const message = useMessage()
+const router = useRouter()
+const session = computed(() => persisted.activeSession)
+
+function goSessions() {
+  router.push('/sessions')
+}
 const lessonsConfigOpen = ref(false)
 const resultsModalOpen = ref(false)
 const courseStarted = ref(false)
 
 const profileOptions = computed(() => {
-  const list = Array.isArray(persisted.cache.electionProfiles) ? persisted.cache.electionProfiles : []
+  const list = Array.isArray(session.value?.electionProfiles) ? session.value.electionProfiles : []
   if (list.length > 0) {
     return list.map((p, idx) => ({
       label: p.title || `轮次 ${idx + 1}`,
@@ -195,7 +210,7 @@ const profileOptions = computed(() => {
 })
 
 const lessonsPreview = computed(() => {
-  const list = Array.isArray(persisted.form.lessonsText) ? persisted.form.lessonsText : []
+  const list = Array.isArray(session.value?.lessonsText) ? session.value.lessonsText : []
   const items = list
     .map((v) => String(v || '').trim())
     .filter(Boolean)
@@ -238,41 +253,60 @@ const columns = [
 ]
 
 function addLesson() {
-  const list = Array.isArray(persisted.form.lessonsText) ? persisted.form.lessonsText : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.lessonsText) ? current.lessonsText : []
   const last = list.length ? String(list[list.length - 1] || '').trim() : ''
   if (list.length > 0 && last === '') return
   list.push('')
-  persisted.form.lessonsText = list
+  current.lessonsText = list
 }
 
 function moveLessonUp(idx) {
-  const list = Array.isArray(persisted.form.lessonsText) ? [...persisted.form.lessonsText] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.lessonsText) ? [...current.lessonsText] : []
   if (idx <= 0 || idx >= list.length) return
   const [item] = list.splice(idx, 1)
   list.splice(idx - 1, 0, item)
-  persisted.form.lessonsText = list
+  current.lessonsText = list
 }
 
 function moveLessonDown(idx) {
-  const list = Array.isArray(persisted.form.lessonsText) ? [...persisted.form.lessonsText] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.lessonsText) ? [...current.lessonsText] : []
   if (idx < 0 || idx >= list.length - 1) return
   const [item] = list.splice(idx, 1)
   list.splice(idx + 1, 0, item)
-  persisted.form.lessonsText = list
+  current.lessonsText = list
 }
 
 function deleteLesson(idx) {
-  const list = Array.isArray(persisted.form.lessonsText) ? [...persisted.form.lessonsText] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.lessonsText) ? [...current.lessonsText] : []
   if (idx < 0 || idx >= list.length) return
   list.splice(idx, 1)
-  persisted.form.lessonsText = list
+  current.lessonsText = list
+}
+
+function requireCookie() {
+  if (!session.value?.cookie) {
+    message.warning('当前会话没有 Cookie，请先到会话页登录或导入')
+    router.push('/sessions')
+    return false
+  }
+  return true
 }
 
 function fetchProfilesCourse() {
+  if (!requireCookie()) return
   ws.sendWs(course.buildFetchProfilesPayload())
 }
 
 function start() {
+  if (!requireCookie()) return
   courseStarted.value = true
   ws.sendWs(course.buildStartPayload())
 }

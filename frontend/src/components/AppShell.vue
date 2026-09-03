@@ -15,6 +15,16 @@
             </div>
           </div>
 
+          <div class="px-4 pb-3">
+            <n-select
+              :value="persisted.activeSessionId || null"
+              :options="sessionOptions"
+              placeholder="选择学生会话"
+              size="small"
+              @update:value="persisted.setActiveSession"
+            />
+          </div>
+
           <div class="px-2 pb-4">
             <n-menu
               :options="menuOptions"
@@ -45,13 +55,23 @@
 <script setup>
 import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NLayout, NLayoutContent, NLayoutSider, NMenu } from 'naive-ui'
+import { NLayout, NLayoutContent, NLayoutSider, NMenu, NSelect } from 'naive-ui'
 import ConsolePanel from './ConsolePanel.vue'
 import { useWsStore } from '@/stores/ws'
+import { usePersistedStore } from '@/stores/persisted'
+import { hostLabel } from '@/shared/utils'
 
 const ws = useWsStore()
+const persisted = usePersistedStore()
 const router = useRouter()
 const route = useRoute()
+
+const sessionOptions = computed(() =>
+  persisted.sessions.map((item) => ({
+    label: `${item.label || item.username || '未命名'} · ${hostLabel(item.url)}`,
+    value: item.id,
+  })),
+)
 
 const activeKey = computed(() => {
   const name = route.name
@@ -117,20 +137,20 @@ function IconInfo() {
 }
 
 const menuOptions = computed(() => [
-  { label: '基础配置', key: 'config', icon: IconGrid },
+  { label: '会话', key: 'sessions', icon: IconDatabase },
   { label: '智能选课', key: 'course', icon: IconWand },
   { label: '智能排课', key: 'schedule', icon: IconCalendar },
-  { label: '缓存配置', key: 'cache', icon: IconDatabase },
   { label: '课程缓存', key: 'lessonCache', icon: IconDatabase },
+  { label: '设置', key: 'config', icon: IconGrid },
   { label: '关于系统', key: 'about', icon: IconInfo },
 ])
 
 function handleMenu(key) {
   const map = {
+    sessions: '/sessions',
     config: '/config',
     course: '/course',
     schedule: '/schedule',
-    cache: '/cache',
     lessonCache: '/lesson-cache',
     about: '/about',
   }

@@ -1,26 +1,25 @@
-// request.js
 const axios = require('axios')
+const https = require('https')
 const cheerio = require('cheerio')
 
-let configuredInstance = null
-
-function configure(url, delay) {
-  if (configuredInstance) {
-  }
-
+function createRequest({ url, delay, insecureTls }) {
   const instance = axios.create({
     baseURL: url,
+    timeout: 20000,
+    validateStatus: () => true,
+    maxRedirects: 5,
+    httpsAgent: insecureTls ? new https.Agent({ rejectUnauthorized: false }) : undefined,
   })
 
   const delayResponse = (response) => {
-    return new Promise(resolve => {
-      setTimeout(() => resolve(response), delay)
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(response), delay || 0)
     })
   }
 
   const delayError = (error) => {
     return new Promise((_, reject) => {
-      setTimeout(() => reject(error), delay)
+      setTimeout(() => reject(error), delay || 0)
     })
   }
 
@@ -28,18 +27,19 @@ function configure(url, delay) {
     (response) => {
       try {
         const requestUrl = response.config.url || ''
-        // 登录请求直接延迟返回
-        if (requestUrl.includes('loginExt')) {
+        if (/login(Ext|Page)?\.action/i.test(requestUrl)) {
           return delayResponse(response)
         }
 
         const html = response.data
+        if (typeof html !== 'string') {
+          return delayResponse(response)
+        }
         const $ = cheerio.load(html)
         const text = $('body').text()
         const loginText = text.includes('过期') || text.includes('登录')
 
         if (loginText) {
-
           return delayError(new Error('检测到登录过期...'))
         }
 
@@ -49,34 +49,35 @@ function configure(url, delay) {
       }
     },
     (error) => {
-      let errMsg = '请求失败，请稍后重试';
+      let errMsg = '请求失败，请稍后重试'
       if (error.code === 'ECONNABORTED') {
-        errMsg = '请求超时，请检查网络';
+        errMsg = '请求超时，请检查网络'
       } else if (error.response) {
-        const status = error.response.status;
+        const status = error.response.status
         switch (status) {
-          case 400: errMsg = '请求参数错误'; break;
-          case 401: errMsg = '未授权，请登录'; break;
-          case 404: errMsg = '请求资源不存在'; break;
-          case 500: errMsg = '服务器内部错误'; break;
-          default: errMsg = `请求失败（状态码：${status}）`;
+          case 400:
+            errMsg = '请求参数错误'
+            break
+          case 401:
+            errMsg = '未授权，请登录'
+            break
+          case 404:
+            errMsg = '请求资源不存在'
+            break
+          case 500:
+            errMsg = '服务器内部错误'
+            break
+          default:
+            errMsg = `请求失败（状态码：${status}）`
         }
       } else if (error.request) {
-        errMsg = '网络错误，请检查地址是否正确';
+        errMsg = '网络错误，请检查地址是否正确'
       }
-      return delayError(new Error(errMsg+' '+error.message));
-    }
+      return delayError(new Error(`${errMsg} ${error.message}`))
+    },
   )
 
-  configuredInstance = instance
   return instance
 }
 
-function getInstance() {
-  if (!configuredInstance) {
-    throw new Error('Request instance not configured. Call configure() first')
-  }
-  return configuredInstance
-}
-
-module.exports = { configure, getInstance }
+module.exports = { createRequest }

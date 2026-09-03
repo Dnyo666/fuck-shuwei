@@ -11,7 +11,7 @@ module.exports = async function fuckLesson(config) {
       }
       newlessonDatas[index].状态 = 'loading'
       config.logger.sendData('table', newlessonDatas)
-      const result = await fuck(config.profileId, lessonId.id, config.cookie)
+      const result = await fuck(config.profileId, lessonId.id, config.cookie, config.request)
 
       newlessonDatas[index].状态 = result
       config.logger.sendData('table', newlessonDatas)
@@ -26,7 +26,7 @@ module.exports = async function fuckLesson(config) {
         newlessonDatas[index].状态 = 'loading'
         config.logger.sendData('table', newlessonDatas)
         try {
-          const result = await fuck(config.profileId, lesson.id, config.cookie)
+          const result = await fuck(config.profileId, lesson.id, config.cookie, config.request)
           newlessonDatas[index].状态 = result
           config.logger.sendData('table', newlessonDatas)
         } catch (error) {

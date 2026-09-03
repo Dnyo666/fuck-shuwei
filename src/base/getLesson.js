@@ -35,6 +35,7 @@ module.exports = async function getLesson(config) {
       const result = await visit(
         '/eams/stdElectCourse!data.action?profileId=' + profileId,
         config.cookie,
+        config.request,
       )
       if (!result) {
         throw new Error('未获取到课程信息')

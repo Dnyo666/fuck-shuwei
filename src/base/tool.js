@@ -1,7 +1,5 @@
-
-const { getInstance } = require('./request')
-
 const fs = require('fs')
+const { USER_AGENT } = require('./probe')
 
  function getLessonsFromCode(lessonJSONs, userLessonCode) {
   return userLessonCode.map((code) => {
@@ -124,16 +122,17 @@ function removeArrays(schedule, lessonFormat) {
   }
   return schedule
 }
-async function visit(href, cookie) {
-  const axios = getInstance()
+async function visit(href, cookie, request) {
+  if (!request) {
+    throw new Error('request client missing')
+  }
   try {
-    const response = await axios.get(href, {
+    const response = await request.get(href, {
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': USER_AGENT,
         Cookie: cookie,
       },
-      validateStatus: (status) => true,
+      validateStatus: () => true,
     })
     return response.data
   } catch (error) {
@@ -157,6 +156,7 @@ async function getElectedLessonNos(config) {
   const page = await visit(
     `/eams/stdElectCourse!defaultPage.action?electionProfile.id=${profileId}`,
     config.cookie,
+    config.request,
   )
   if (!page) {
     return { ids: [], nos: [], missingIds: [] }

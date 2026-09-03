@@ -21,8 +21,8 @@ export const useWsStore = defineStore('ws', {
     },
     backendBaseUrl() {
       const v = import.meta.env.VITE_BACKEND_URL
-      if (typeof v === 'string' && v.trim()) return v.trim()
-      return `http://${window.location.hostname}:3000`
+      if (typeof v === 'string' && v.trim()) return v.trim().replace(/\/+$/, '')
+      return window.location.origin
     },
     wsStatusLabel() {
       if (this.wsStatus === 'open') return '已连接'
@@ -99,7 +99,7 @@ export const useWsStore = defineStore('ws', {
       if (type === 'cache') {
         const key = data?.key
         const value = data?.value
-        persisted.applyCache(key, value)
+        persisted.applyCache(key, value, data?.sessionId)
         logs.pushLog('cache', `${key} 已更新`)
         return
       }

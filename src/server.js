@@ -7,12 +7,126 @@ const { startMainProcess } = require('./fuck/main.js')
 const { startScheduleProcess } = require('./row/main.js')
 const { startBaseProcess } = require('./base/main.js')
 const { getElectedLessonNos } = require('./base/tool.js')
+const {
+  prepareLoginSession,
+  refreshCaptchaImage,
+  submitPasswordLogin,
+  importCookieSession,
+} = require('./base/session.js')
 
 
 const HTTP_PORT = Number(process.env.PORT || process.env.HTTP_PORT || 3000)
 const WS_PORT = Number(process.env.WS_PORT || 8080)
 
 const app = express()
+app.use(express.json({ limit: '1mb' }))
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) {
+    next()
+    return
+  }
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  if (req.method === 'OPTIONS') {
+    res.status(204).end()
+    return
+  }
+  next()
+})
+
+function apiError(res, error) {
+  res.status(400).json({
+    ok: false,
+    error: error.message || String(error),
+  })
+}
+
+app.post('/api/login/session', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const result = await prepareLoginSession({
+      url: body.url,
+      insecureTls: Boolean(body.insecureTls),
+    })
+    res.json({
+      ok: true,
+      cookie: result.cookie,
+      salt: result.salt,
+      requiresCaptcha: result.requiresCaptcha,
+      captcha: result.captcha,
+      loginPath: result.loginPath,
+      url: result.url,
+      urlChanged: result.urlChanged,
+      requestedUrl: result.requestedUrl,
+    })
+  } catch (error) {
+    apiError(res, error)
+  }
+})
+
+app.post('/api/login/captcha', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const result = await refreshCaptchaImage({
+      url: body.url,
+      cookie: body.cookie,
+      loginPath: body.loginPath,
+      insecureTls: Boolean(body.insecureTls),
+    })
+    res.json({
+      ok: true,
+      captcha: result.captcha,
+    })
+  } catch (error) {
+    apiError(res, error)
+  }
+})
+
+app.post('/api/login/submit', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const result = await submitPasswordLogin({
+      url: body.url,
+      cookie: body.cookie,
+      salt: body.salt,
+      loginPath: body.loginPath,
+      username: body.username,
+      password: body.password,
+      captchaResponse: body.captchaResponse,
+      insecureTls: Boolean(body.insecureTls),
+    })
+    res.json({
+      ok: true,
+      cookie: result.cookie,
+      url: result.url,
+      loginPath: result.loginPath,
+    })
+  } catch (error) {
+    apiError(res, error)
+  }
+})
+
+app.post('/api/session/import', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const result = await importCookieSession({
+      url: body.url,
+      cookie: body.cookie,
+      insecureTls: Boolean(body.insecureTls),
+    })
+    res.json({
+      ok: true,
+      cookie: result.cookie,
+      url: result.url,
+      urlChanged: result.urlChanged,
+      requestedUrl: result.requestedUrl,
+    })
+  } catch (error) {
+    apiError(res, error)
+  }
+})
+
 app.use(express.static(path.join(__dirname, '../public')))
 app.listen(HTTP_PORT, () => { })
 
@@ -74,29 +188,38 @@ wss.on('connection', (ws) => {
         logger.sendData('good', '已经有运行的实例了, 请稍后再试')
         return
       }
+      const sessionId = message.config && message.config.sessionId
+      const taskLogger = {
+        sendData: (type, data) => {
+          if (type === 'cache' && data && typeof data === 'object' && !Array.isArray(data)) {
+            logger.sendData(type, { ...data, sessionId })
+            return
+          }
+          logger.sendData(type, data)
+        },
+      }
       if (message.type === 'fuckStart') {
         clients.get(clientId).status = 'running'
         ws.send(JSON.stringify({ type: 'fuckStarted' }))
-        message.config.logger = logger
+        message.config.logger = taskLogger
         await startMainProcess(message.config)
       } else if (message.type === 'rowStart') {
         clients.get(clientId).status = 'running'
         ws.send(JSON.stringify({ type: 'rowStarted' }))
-        message.config.logger = logger
+        message.config.logger = taskLogger
         await startScheduleProcess(message.config)
       } else if (message.type === 'getProfiles') {
-        // 独立的轮次数据获取功能，直接调用base/main
         clients.get(clientId).status = 'running'
         ws.send(JSON.stringify({ type: 'profilesStarted' }))
-        message.config.logger = logger
+        message.config.logger = taskLogger
         await startBaseProcess(message.config)
       } else if (message.type === 'getYixuanData') {
         clients.get(clientId).status = 'running'
         ws.send(JSON.stringify({ type: 'yixuanDataStarted' }))
-        message.config.logger = logger
+        message.config.logger = taskLogger
         const baseConfig = await startBaseProcess(message.config)
         const { nos, missingIds } = await getElectedLessonNos(baseConfig)
-        logger.sendData('cache', { key: 'yixuanData', value: JSON.stringify(nos) })
+        taskLogger.sendData('cache', { key: 'yixuanData', value: JSON.stringify(nos) })
         if (missingIds.length > 0) {
           logger.sendData('log', `已选课程解析完成，未映射课程数: ${missingIds.length}`)
         } else {

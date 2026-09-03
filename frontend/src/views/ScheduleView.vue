@@ -1,5 +1,12 @@
 <template>
-  <div class="h-full flex flex-col gap-6">
+  <div v-if="!session" class="h-full flex items-center justify-center">
+    <n-card class="max-w-md text-center">
+      <div class="text-base font-semibold">还没有当前会话</div>
+      <div class="mt-2 text-sm text-slate-600">先到会话页登录或导入 Cookie，再开始排课。</div>
+      <n-button class="mt-4" type="primary" @click="goSessions">前往会话</n-button>
+    </n-card>
+  </div>
+  <div v-else class="h-full flex flex-col gap-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div class="text-xl font-semibold tracking-wide">智能排课</div>
@@ -18,7 +25,7 @@
           <div class="flex flex-col gap-3 rounded-2xl border border-black/10 bg-white/60 px-5 py-4 mb-5">
             <div class="flex flex-wrap items-center gap-3">
               <n-select
-                v-model:value="persisted.form.scheduleCount"
+                v-model:value="session.scheduleCount"
                 size="small"
                 class="w-[240px]"
                 :options="profileOptions"
@@ -43,7 +50,7 @@
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <div class="text-sm font-semibold text-slate-900">目标课程</div>
-                  <div class="mt-1 text-xs text-slate-600">共 {{ persisted.scheduleInput.lessonCodes.length }} 条</div>
+                  <div class="mt-1 text-xs text-slate-600">共 {{ session.scheduleInput.lessonCodes.length }} 条</div>
                 </div>
                 <n-button size="small" secondary @click="lessonCodeConfigOpen = true">配置</n-button>
               </div>
@@ -54,7 +61,7 @@
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <div class="text-sm font-semibold text-slate-900">已选课程</div>
-                  <div class="mt-1 text-xs text-slate-600">共 {{ persisted.cache.yixuanData.length }} 条</div>
+                  <div class="mt-1 text-xs text-slate-600">共 {{ session.yixuanData.length }} 条</div>
                 </div>
                 <div class="flex items-center gap-2">
                   <n-button size="small" secondary :disabled="ws.processing" @click="fetchYixuanDataSchedule()">
@@ -71,23 +78,23 @@
               <div class="mt-4 w-full flex flex-wrap gap-3">
                 <div class="flex items-center justify-between rounded-2xl border border-black/10 bg-white/60 px-4 py-3 min-w-[210px] flex-1">
                   <div class="text-[13px] text-slate-800">避免早八</div>
-                  <n-switch v-model:value="persisted.schedulePrefs.zaoba" />
+                  <n-switch v-model:value="session.schedulePrefs.zaoba" />
                 </div>
                 <div class="flex items-center justify-between rounded-2xl border border-black/10 bg-white/60 px-4 py-3 min-w-[210px] flex-1">
                   <div class="text-[13px] text-slate-800">尽量不排周五</div>
-                  <n-switch v-model:value="persisted.schedulePrefs.zhouwu" />
+                  <n-switch v-model:value="session.schedulePrefs.zhouwu" />
                 </div>
                 <div class="flex items-center justify-between rounded-2xl border border-black/10 bg-white/60 px-4 py-3 min-w-[210px] flex-1">
                   <div class="text-[13px] text-slate-800">尽量不排周一</div>
-                  <n-switch v-model:value="persisted.schedulePrefs.zhouyi" />
+                  <n-switch v-model:value="session.schedulePrefs.zhouyi" />
                 </div>
                 <div class="flex items-center justify-between rounded-2xl border border-black/10 bg-white/60 px-4 py-3 min-w-[210px] flex-1">
                   <div class="text-[13px] text-slate-800">尽量不排周六</div>
-                  <n-switch v-model:value="persisted.schedulePrefs.zhoulio" />
+                  <n-switch v-model:value="session.schedulePrefs.zhoulio" />
                 </div>
                 <div class="flex items-center justify-between rounded-2xl border border-black/10 bg-white/60 px-4 py-3 min-w-[210px] flex-1">
                   <div class="text-[13px] text-slate-800">尽量不排周日</div>
-                  <n-switch v-model:value="persisted.schedulePrefs.zhouri" />
+                  <n-switch v-model:value="session.schedulePrefs.zhouri" />
                 </div>
               </div>
             </div>
@@ -110,20 +117,20 @@
           <n-scrollbar class="h-[420px]">
             <div class="p-2 space-y-2">
               <div
-                v-for="(code, idx) in persisted.scheduleInput.lessonCodes"
+                v-for="(code, idx) in session.scheduleInput.lessonCodes"
                 :key="`${idx}-${code}`"
                 class="rounded-xl border border-black/10 bg-white/70 px-2 py-2"
               >
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="min-w-[180px] flex-1">
-                    <n-input v-model:value="persisted.scheduleInput.lessonCodes[idx]" size="small" placeholder="例如 001.1.1" />
+                    <n-input v-model:value="session.scheduleInput.lessonCodes[idx]" size="small" placeholder="例如 001.1.1" />
                   </div>
                   <div class="flex items-center gap-1 shrink-0">
                     <n-button size="tiny" secondary :disabled="idx === 0" @click="moveLessonCodeUp(idx)">上移</n-button>
                     <n-button
                       size="tiny"
                       secondary
-                      :disabled="idx >= persisted.scheduleInput.lessonCodes.length - 1"
+                      :disabled="idx >= session.scheduleInput.lessonCodes.length - 1"
                       @click="moveLessonCodeDown(idx)"
                     >
                       下移
@@ -133,7 +140,7 @@
                 </div>
               </div>
 
-              <div v-if="persisted.scheduleInput.lessonCodes.length === 0" class="py-10 text-center text-sm text-slate-500">
+              <div v-if="session.scheduleInput.lessonCodes.length === 0" class="py-10 text-center text-sm text-slate-500">
                 还没有添加目标课程
               </div>
 
@@ -169,20 +176,20 @@
           <n-scrollbar class="h-[420px]">
             <div class="p-2 space-y-2">
               <div
-                v-for="(no, idx) in persisted.cache.yixuanData"
+                v-for="(no, idx) in session.yixuanData"
                 :key="`${idx}-${no}`"
                 class="rounded-xl border border-black/10 bg-white/70 px-2 py-2"
               >
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="min-w-[180px] flex-1">
-                    <n-input v-model:value="persisted.cache.yixuanData[idx]" size="small" placeholder="课程序号（如 001.1.1）" />
+                    <n-input v-model:value="session.yixuanData[idx]" size="small" placeholder="课程序号（如 001.1.1）" />
                   </div>
                   <div class="flex items-center gap-1 shrink-0">
                     <n-button size="tiny" secondary :disabled="idx === 0" @click="moveYixuanUp(idx)">上移</n-button>
                     <n-button
                       size="tiny"
                       secondary
-                      :disabled="idx >= persisted.cache.yixuanData.length - 1"
+                      :disabled="idx >= session.yixuanData.length - 1"
                       @click="moveYixuanDown(idx)"
                     >
                       下移
@@ -192,7 +199,7 @@
                 </div>
               </div>
 
-              <div v-if="persisted.cache.yixuanData.length === 0" class="py-10 text-center text-sm text-slate-500">
+              <div v-if="session.yixuanData.length === 0" class="py-10 text-center text-sm text-slate-500">
                 还没有添加已选课程
               </div>
 
@@ -437,7 +444,9 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import {
+  useMessage,
   NButton,
   NCard,
   NInput,
@@ -454,6 +463,13 @@ import { useWsStore } from '@/stores/ws'
 const persisted = usePersistedStore()
 const ws = useWsStore()
 const schedule = useScheduleStore()
+const message = useMessage()
+const router = useRouter()
+const session = computed(() => persisted.activeSession)
+
+function goSessions() {
+  router.push('/sessions')
+}
 
 const resultsModalOpen = ref(false)
 const includeYixuan = ref(true)
@@ -466,7 +482,7 @@ const lessonCodeConfigOpen = ref(false)
 const yixuanConfigOpen = ref(false)
 
 const lessonCodePreview = computed(() => {
-  const list = Array.isArray(persisted.scheduleInput.lessonCodes) ? persisted.scheduleInput.lessonCodes : []
+  const list = Array.isArray(session.value?.scheduleInput?.lessonCodes) ? session.value.scheduleInput.lessonCodes : []
   const items = list
     .map((v) => String(v || '').trim())
     .filter(Boolean)
@@ -475,7 +491,7 @@ const lessonCodePreview = computed(() => {
 })
 
 const yixuanPreview = computed(() => {
-  const list = Array.isArray(persisted.cache.yixuanData) ? persisted.cache.yixuanData : []
+  const list = Array.isArray(session.value?.yixuanData) ? session.value.yixuanData : []
   const items = list
     .map((v) => String(v || '').trim())
     .filter(Boolean)
@@ -484,7 +500,7 @@ const yixuanPreview = computed(() => {
 })
 
 const profileOptions = computed(() => {
-  const list = Array.isArray(persisted.cache.electionProfiles) ? persisted.cache.electionProfiles : []
+  const list = Array.isArray(session.value?.electionProfiles) ? session.value.electionProfiles : []
   if (list.length > 0) {
     return list.map((p, idx) => ({
       label: p.title || `轮次 ${idx + 1}`,
@@ -504,74 +520,102 @@ const filteredScheduleTable = computed(() => {
   return list.filter((r) => String(r?.summary || '').toLowerCase().includes(q))
 })
 
+function requireCookie() {
+  if (!session.value?.cookie) {
+    message.warning('当前会话没有 Cookie，请先到会话页登录或导入')
+    router.push('/sessions')
+    return false
+  }
+  return true
+}
+
 function fetchProfilesSchedule() {
+  if (!requireCookie()) return
   ws.sendWs(schedule.buildFetchProfilesPayload())
 }
 
 function fetchYixuanDataSchedule() {
+  if (!requireCookie()) return
   ws.sendWs(schedule.buildFetchYixuanDataPayload())
 }
 
 function addLessonCode() {
-  const list = Array.isArray(persisted.scheduleInput.lessonCodes) ? persisted.scheduleInput.lessonCodes : []
+  const current = session.value
+  if (!current) return
+  if (!current.scheduleInput) current.scheduleInput = { lessonCodes: [] }
+  const list = Array.isArray(current.scheduleInput.lessonCodes) ? current.scheduleInput.lessonCodes : []
   const last = list.length ? String(list[list.length - 1] || '').trim() : ''
   if (list.length > 0 && last === '') return
   list.push('')
-  persisted.scheduleInput.lessonCodes = list
+  current.scheduleInput.lessonCodes = list
 }
 
 function moveLessonCodeUp(idx) {
-  const list = Array.isArray(persisted.scheduleInput.lessonCodes) ? [...persisted.scheduleInput.lessonCodes] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.scheduleInput?.lessonCodes) ? [...current.scheduleInput.lessonCodes] : []
   if (idx <= 0 || idx >= list.length) return
   const [item] = list.splice(idx, 1)
   list.splice(idx - 1, 0, item)
-  persisted.scheduleInput.lessonCodes = list
+  current.scheduleInput.lessonCodes = list
 }
 
 function moveLessonCodeDown(idx) {
-  const list = Array.isArray(persisted.scheduleInput.lessonCodes) ? [...persisted.scheduleInput.lessonCodes] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.scheduleInput?.lessonCodes) ? [...current.scheduleInput.lessonCodes] : []
   if (idx < 0 || idx >= list.length - 1) return
   const [item] = list.splice(idx, 1)
   list.splice(idx + 1, 0, item)
-  persisted.scheduleInput.lessonCodes = list
+  current.scheduleInput.lessonCodes = list
 }
 
 function deleteLessonCode(idx) {
-  const list = Array.isArray(persisted.scheduleInput.lessonCodes) ? [...persisted.scheduleInput.lessonCodes] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.scheduleInput?.lessonCodes) ? [...current.scheduleInput.lessonCodes] : []
   if (idx < 0 || idx >= list.length) return
   list.splice(idx, 1)
-  persisted.scheduleInput.lessonCodes = list
+  current.scheduleInput.lessonCodes = list
 }
 
 function addYixuan() {
-  if (!Array.isArray(persisted.cache.yixuanData)) persisted.cache.yixuanData = []
-  const list = persisted.cache.yixuanData
+  const current = session.value
+  if (!current) return
+  if (!Array.isArray(current.yixuanData)) current.yixuanData = []
+  const list = current.yixuanData
   const last = list.length ? String(list[list.length - 1] || '').trim() : ''
   if (list.length > 0 && last === '') return
   list.push('')
 }
 
 function moveYixuanUp(idx) {
-  const list = Array.isArray(persisted.cache.yixuanData) ? [...persisted.cache.yixuanData] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.yixuanData) ? [...current.yixuanData] : []
   if (idx <= 0 || idx >= list.length) return
   const [item] = list.splice(idx, 1)
   list.splice(idx - 1, 0, item)
-  persisted.cache.yixuanData = list
+  current.yixuanData = list
 }
 
 function moveYixuanDown(idx) {
-  const list = Array.isArray(persisted.cache.yixuanData) ? [...persisted.cache.yixuanData] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.yixuanData) ? [...current.yixuanData] : []
   if (idx < 0 || idx >= list.length - 1) return
   const [item] = list.splice(idx, 1)
   list.splice(idx + 1, 0, item)
-  persisted.cache.yixuanData = list
+  current.yixuanData = list
 }
 
 function deleteYixuan(idx) {
-  const list = Array.isArray(persisted.cache.yixuanData) ? [...persisted.cache.yixuanData] : []
+  const current = session.value
+  if (!current) return
+  const list = Array.isArray(current.yixuanData) ? [...current.yixuanData] : []
   if (idx < 0 || idx >= list.length) return
   list.splice(idx, 1)
-  persisted.cache.yixuanData = list
+  current.yixuanData = list
 }
 
 const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -763,6 +807,7 @@ function openResultsModal() {
 }
 
 function startSchedule() {
+  if (!requireCookie()) return
   schedulingStarted.value = true
   ws.sendWs(schedule.buildStartPayload())
 }

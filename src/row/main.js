@@ -3,13 +3,25 @@ const getformatDatas = require('./getFormatDatas')
 const rowLesson = require('./rowLesson')
 const calcWeight = require('./calcWeight')
 const base = require('../base/main')
+const { createRequest } = require('../base/request')
 
 const startScheduleProcess = async (config) => {
 
   try {
+    config.request = createRequest({
+      url: config.url,
+      delay: config.delay,
+      insecureTls: config.insecureTls,
+    })
     config.logger.sendData('log', '获取课程数据')
     try {
-      config.lessonJSONs = getLessonJSONs(config.lessonDatas)
+      if (Array.isArray(config.lessonJSONs)) {
+        // already prepared
+      } else if (config.lessonDatas) {
+        config.lessonJSONs = getLessonJSONs(config.lessonDatas)
+      } else {
+        throw new Error('need lesson fetch')
+      }
     }
     catch {
       config = { ...config, ...await base.startBaseProcess(config) }

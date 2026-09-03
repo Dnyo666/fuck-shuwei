@@ -55,22 +55,23 @@ export const useScheduleStore = defineStore('schedule', {
     },
     buildStartPayload() {
       const persisted = usePersistedStore()
+      const session = persisted.activeSession
       const base = persisted.buildScheduleBaseConfig()
-      const lessonCodes = (persisted.scheduleInput.lessonCodes || []).map((s) => String(s).trim()).filter(Boolean)
-      const yixuanData = (persisted.cache.yixuanData || []).map((s) => String(s).trim()).filter(Boolean)
+      const lessonCodes = (session?.scheduleInput?.lessonCodes || []).map((s) => String(s).trim()).filter(Boolean)
+      const yixuanData = (session?.yixuanData || []).map((s) => String(s).trim()).filter(Boolean)
+      const prefs = session?.schedulePrefs || {}
       const config = {
         ...base,
         lessonCodes,
         yixuanData,
-        zaoba: Boolean(persisted.schedulePrefs.zaoba),
-        zhouwu: Boolean(persisted.schedulePrefs.zhouwu),
-        zhouyi: Boolean(persisted.schedulePrefs.zhouyi),
-        zhoulio: Boolean(persisted.schedulePrefs.zhoulio),
-        zhouri: Boolean(persisted.schedulePrefs.zhouri),
+        zaoba: Boolean(prefs.zaoba),
+        zhouwu: Boolean(prefs.zhouwu),
+        zhouyi: Boolean(prefs.zhouyi),
+        zhoulio: Boolean(prefs.zhoulio),
+        zhouri: Boolean(prefs.zhouri),
       }
       persisted.persist()
       return { type: 'rowStart', config }
     },
   },
 })
-

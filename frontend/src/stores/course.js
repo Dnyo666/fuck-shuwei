@@ -28,14 +28,15 @@ export const useCourseStore = defineStore('course', {
     },
     buildStartPayload() {
       const persisted = usePersistedStore()
+      const session = persisted.activeSession
       const base = persisted.buildCourseBaseConfig()
-      const lessons = (persisted.form.lessonsText || [])
+      const lessons = (session?.lessonsText || [])
         .map((s) => String(s).trim())
         .filter(Boolean)
         .map((value) => ({ value }))
       const config = {
         ...base,
-        selectionModel: persisted.form.selectionModel || '2',
+        selectionModel: session?.selectionModel || '2',
         lessons,
       }
       persisted.persist()
@@ -43,4 +44,3 @@ export const useCourseStore = defineStore('course', {
     },
   },
 })
-

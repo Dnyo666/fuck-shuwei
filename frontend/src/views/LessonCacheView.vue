@@ -3,7 +3,7 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div class="text-xl font-semibold tracking-wide">课程缓存</div>
-        <div class="mt-1 text-sm text-slate-600">按轮次缓存 lessonJSONs，减少请求与解析</div>
+        <div class="mt-1 text-sm text-slate-600">当前会话按轮次缓存 lessonJSONs，减少请求与解析</div>
       </div>
     </div>
 
@@ -75,13 +75,14 @@ import { usePersistedStore } from '@/stores/persisted'
 const store = usePersistedStore()
 const selectedProfileId = ref('')
 const query = ref('')
+const session = computed(() => store.activeSession)
 
-const profileIds = computed(() => Object.keys(store.cache.lessonJSONsCache || {}))
+const profileIds = computed(() => Object.keys(session.value?.lessonJSONsCache || {}))
 const profileOptions = computed(() => profileIds.value.map((id) => ({ label: id, value: id })))
 
 const currentRaw = computed(() => {
   if (!selectedProfileId.value) return null
-  return store.cache.lessonJSONsCache?.[selectedProfileId.value] ?? null
+  return session.value?.lessonJSONsCache?.[selectedProfileId.value] ?? null
 })
 
 const currentJson = computed(() => {
