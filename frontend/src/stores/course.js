@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { usePersistedStore } from '@/stores/persisted'
+import { dropLessonFromSession } from '@/shared/timetable'
 
 export const useCourseStore = defineStore('course', {
   state: () => ({
     courseTable: [],
+    lastWithdraw: null,
   }),
   actions: {
     clearCourseResults() {
@@ -30,6 +32,16 @@ export const useCourseStore = defineStore('course', {
       const persisted = usePersistedStore()
       const config = persisted.buildCourseBaseConfig()
       return { type: 'getTimetable', config }
+    },
+    finishWithdraw(payload) {
+      const result = payload?.result || 'error'
+      const lessonId = String(payload?.lessonId || '').replace(/^l/, '').trim()
+      const detail = typeof payload?.detail === 'string' ? payload.detail : ''
+      this.lastWithdraw = { result, lessonId, detail, at: Date.now() }
+      if (result !== 'success' || !lessonId) return
+      const persisted = usePersistedStore()
+      const session = persisted.activeSession
+      if (session) dropLessonFromSession(session, { id: lessonId })
     },
     buildWithdrawPayload(lessonId) {
       const persisted = usePersistedStore()

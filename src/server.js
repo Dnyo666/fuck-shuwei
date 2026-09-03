@@ -7,7 +7,7 @@ const { startMainProcess } = require('./fuck/main.js')
 const { startScheduleProcess } = require('./row/main.js')
 const { startBaseProcess } = require('./base/main.js')
 const { startTimetableProcess } = require('./base/getTimetable.js')
-const { startWithdrawProcess } = require('./base/withdrawLesson.js')
+const { startWithdrawProcess, refreshAfterWithdraw } = require('./base/withdrawLesson.js')
 const {
   prepareLoginSession,
   refreshCaptchaImage,
@@ -184,7 +184,9 @@ wss.on('connection', (ws) => {
     let message = null;
     try {
       message = JSON.parse(data)
-      logger.sendData('good', '收到启动请求')
+      if (message.type !== 'withdrawLesson') {
+        logger.sendData('good', '收到启动请求')
+      }
       if (clients.get(clientId).status === 'running') {
         logger.sendData('good', '已经有运行的实例了, 请稍后再试')
         return
@@ -225,7 +227,21 @@ wss.on('connection', (ws) => {
         clients.get(clientId).status = 'running'
         ws.send(JSON.stringify({ type: 'withdrawStarted' }))
         message.config.logger = taskLogger
-        await startWithdrawProcess(message.config)
+        const outcome = await startWithdrawProcess(message.config)
+        message.withdrawResult = outcome
+        ws.send(JSON.stringify({ type: 'withdrawResult', data: outcome }))
+        ws.send(JSON.stringify({ type: 'withdrawEnded' }))
+        message.withdrawSettled = true
+        const current = clients.get(clientId)
+        if (current) current.status = 'idle'
+        if (outcome && outcome.result === 'success') {
+          try {
+            await refreshAfterWithdraw(message.config, outcome.profileId)
+          } catch (error) {
+            logger.sendData('error', `课表刷新未完成：${error.message || error}`)
+          }
+        }
+        ws.send(JSON.stringify({ type: 'withdrawRefreshEnded' }))
       }
     } catch (error) {
       logger.sendData('error', `消息处理错误: ${error.message || error.toString()}`)
@@ -250,7 +266,11 @@ wss.on('connection', (ws) => {
         ws.send(JSON.stringify({
           type: message.type === 'getTimetable' ? 'timetableEnded' : 'yixuanDataEnded',
         }))
-      } else if (message && message.type === 'withdrawLesson') {
+      } else if (message && message.type === 'withdrawLesson' && !message.withdrawSettled) {
+        ws.send(JSON.stringify({
+          type: 'withdrawResult',
+          data: message.withdrawResult || { result: 'error', lessonId: message.config && message.config.lessonId },
+        }))
         ws.send(JSON.stringify({ type: 'withdrawEnded' }))
       }
     }

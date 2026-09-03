@@ -140,6 +140,58 @@ export function canWithdrawLesson(item) {
   return Boolean(lessonNumericId(item) && item?.withdrawable !== false)
 }
 
+export function withdrawResultLabel(result, detail) {
+  const text = String(detail || '').trim()
+  if (result !== 'success' && /[\u4e00-\u9fff]/.test(text)) return text
+  const map = {
+    success: '已退课',
+    clash: '教务未通过：存在冲突',
+    noopen: '当前不在退课时间',
+    full: '人数已满',
+    overtime: '登录超时，请重新登录',
+    selected: '课程状态已变化',
+    forbidden: '本轮不可退这门课',
+    error: '教务未通过',
+  }
+  return map[result] || text || '教务未通过'
+}
+
+export function dropLessons(list, ref) {
+  const banned = new Set(identityTokens(ref))
+  if (!banned.size) return Array.isArray(list) ? list.slice() : []
+  return (Array.isArray(list) ? list : []).filter((row) => !identityTokens(row).some((token) => banned.has(token)))
+}
+
+export function snapshotLessonState(session) {
+  return {
+    electedLessons: Array.isArray(session?.electedLessons) ? session.electedLessons.map((row) => ({ ...row })) : [],
+    yixuanData: Array.isArray(session?.yixuanData) ? [...session.yixuanData] : [],
+    timetable: session?.timetable
+      ? {
+          ...session.timetable,
+          courses: Array.isArray(session.timetable.courses) ? session.timetable.courses.map((row) => ({ ...row })) : [],
+          activities: Array.isArray(session.timetable.activities) ? session.timetable.activities.map((row) => ({ ...row })) : [],
+        }
+      : null,
+  }
+}
+
+export function dropLessonFromSession(session, item) {
+  if (!session || !item) return
+  const banned = new Set(identityTokens(item))
+  session.electedLessons = dropLessons(session.electedLessons, item)
+  session.yixuanData = (Array.isArray(session.yixuanData) ? session.yixuanData : []).filter((token) => {
+    const value = String(token || '').replace(/^l/, '').trim()
+    return value && !banned.has(value)
+  })
+  if (!session.timetable) return
+  session.timetable = {
+    ...session.timetable,
+    courses: dropLessons(session.timetable.courses, item),
+    activities: dropLessons(session.timetable.activities, item),
+  }
+}
+
 export function collectElectedLessons(session) {
   return mergeLessons([
     ...(Array.isArray(session?.electedLessons) ? session.electedLessons : []),

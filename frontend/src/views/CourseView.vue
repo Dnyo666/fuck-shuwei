@@ -263,7 +263,7 @@ import { useCourseStore } from '@/stores/course'
 import { usePersistedStore } from '@/stores/persisted'
 import { useWsStore } from '@/stores/ws'
 import { findLessonInCache, normalizeLessonJSONs } from '@/shared/utils'
-import { collectElectedLessons, identityTokens, kindSummary, lessonListKey, lessonNumericId } from '@/shared/timetable'
+import { collectElectedLessons, identityTokens, kindSummary, lessonListKey, lessonNumericId, withdrawResultLabel } from '@/shared/timetable'
 import TimetableGrid from '@/components/TimetableGrid.vue'
 import ElectedLessonList from '@/components/ElectedLessonList.vue'
 
@@ -521,6 +521,16 @@ function start() {
   courseStarted.value = true
   ws.sendWs(course.buildStartPayload())
 }
+
+watch(
+  () => course.lastWithdraw,
+  (info) => {
+    if (!info?.at) return
+    const text = withdrawResultLabel(info.result, info.detail)
+    if (info.result === 'success') message.success(text)
+    else message.warning(text)
+  },
+)
 
 watch(
   () => ws.processing,

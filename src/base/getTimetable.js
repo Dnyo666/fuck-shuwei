@@ -319,15 +319,28 @@ function activitiesFromLessons(lessons) {
   return rows
 }
 
+function cachedTableMeta(config) {
+  const raw = config.timetableMeta || config.timetable || {}
+  const studentId = String(raw.studentId || raw.ids || '').trim()
+  const semesterId = String(raw.semesterId || '').trim()
+  if (/^\d+$/.test(studentId) && /^\d+$/.test(semesterId)) {
+    return { studentId, semesterId }
+  }
+  return { studentId: '', semesterId: '' }
+}
+
 async function fetchOfficialTimetable(config) {
-  let index = await visit('/eams/courseTableForStd.action', config.cookie, config.request)
-  let meta = parseCourseTableMeta(index)
+  let meta = cachedTableMeta(config)
   if (!meta.studentId || !meta.semesterId) {
-    try {
-      index = await visit('/eams/courseTableForStd!innerIndex.action', config.cookie, config.request)
-      meta = parseCourseTableMeta(index)
-    } catch {
-      // keep the first parse
+    let index = await visit('/eams/courseTableForStd.action', config.cookie, config.request)
+    meta = parseCourseTableMeta(index)
+    if (!meta.studentId || !meta.semesterId) {
+      try {
+        index = await visit('/eams/courseTableForStd!innerIndex.action', config.cookie, config.request)
+        meta = parseCourseTableMeta(index)
+      } catch {
+        // keep the first parse
+      }
     }
   }
   if (!meta.studentId || !meta.semesterId) {
@@ -357,14 +370,18 @@ async function fetchOfficialTimetable(config) {
   }
 }
 
-async function fetchElectPageLessons(config) {
+async function fetchElectPageLessons(config, options = {}) {
   const profiles = Array.isArray(config.electionProfiles) ? config.electionProfiles : []
   const cache = config.lessonJSONsCache && typeof config.lessonJSONsCache === 'object' ? { ...config.lessonJSONsCache } : {}
   const collected = []
+  const wanted = Array.isArray(options.profileIds) && options.profileIds.length
+    ? new Set(options.profileIds.map((id) => String(id)))
+    : null
   const pages = profiles.length ? profiles : [{ id: config.profileId, category: '', title: '' }]
 
   for (const profile of pages) {
     if (!profile?.id) continue
+    if (wanted && !wanted.has(String(profile.id))) continue
     let page = ''
     try {
       page = await visit(
@@ -434,27 +451,37 @@ function attachArrangeFromActivities(courses, activities) {
   })
 }
 
-async function startTimetableProcess(config) {
+async function startTimetableProcess(config, options = {}) {
   try {
-    config.request = createRequest({
-      url: config.url,
-      delay: config.delay,
-      insecureTls: config.insecureTls,
-    })
+    if (!options.reuseRequest || !config.request) {
+      config.request = createRequest({
+        url: config.url,
+        delay: config.delay,
+        insecureTls: config.insecureTls,
+      })
+    }
     config = await getCookie(config)
-    try {
-      config = await getProfileId(config)
-    } catch (error) {
-      config.logger.sendData('log', `轮次列表未完全取到：${error.message || error}`)
+    if (!options.skipProfiles) {
+      try {
+        config = await getProfileId(config)
+      } catch (error) {
+        config.logger.sendData('log', `轮次列表未完全取到：${error.message || error}`)
+      }
     }
 
-    config.logger.sendData('log', '拉取我的课表')
+    if (!config.quiet) {
+      config.logger.sendData('log', options.skipProfiles ? '刷新当前课表' : '拉取我的课表')
+    }
     const timetable = await fetchOfficialTimetable(config)
     if (!timetable.studentId || !timetable.semesterId) {
       config.logger.sendData('log', '课表页没有解析到学期或学生 id，请确认当前会话仍已登录')
     }
-    config.logger.sendData('log', '拉取已选课程（含必修、实习和已选选修）')
-    const electLessons = await fetchElectPageLessons(config)
+    if (!config.quiet) {
+      config.logger.sendData('log', options.skipProfiles ? '核对已选课程' : '拉取已选课程（含必修、实习和已选选修）')
+    }
+    const electLessons = await fetchElectPageLessons(config, {
+      profileIds: options.profileIds,
+    })
     let courses = mergeLessons([
       ...(timetable.courses || []).map((item) => normalizeLesson(item)),
       ...electLessons,
@@ -491,10 +518,12 @@ async function startTimetableProcess(config) {
     config.logger.sendData('cache', { key: 'timetable', value: JSON.stringify(config.timetable) })
     config.logger.sendData('cache', { key: 'electedLessons', value: JSON.stringify(courses) })
     config.logger.sendData('cache', { key: 'yixuanData', value: JSON.stringify(yixuanNos) })
-    config.logger.sendData(
-      'log',
-      `课表 ${timetable.activities.length} 段，已选 ${courses.length} 门（必修 ${courses.filter((x) => x.kind === '必修').length} / 选修 ${courses.filter((x) => x.kind === '选修').length} / 实习 ${courses.filter((x) => x.kind === '实习').length}）`,
-    )
+    if (!config.quiet) {
+      config.logger.sendData(
+        'log',
+        `课表 ${timetable.activities.length} 段，已选 ${courses.length} 门（必修 ${courses.filter((x) => x.kind === '必修').length} / 选修 ${courses.filter((x) => x.kind === '选修').length} / 实习 ${courses.filter((x) => x.kind === '实习').length}）`,
+      )
+    }
     return config
   } catch (error) {
     const text = error && error.message ? error.message : String(error)

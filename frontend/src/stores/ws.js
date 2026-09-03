@@ -11,6 +11,7 @@ export const useWsStore = defineStore('ws', {
     ws: null,
     wsStatus: 'idle',
     processing: false,
+    muteCacheLogs: false,
     lastMessageAt: 0,
   }),
   getters: {
@@ -100,6 +101,9 @@ export const useWsStore = defineStore('ws', {
         const key = data?.key
         const value = data?.value
         persisted.applyCache(key, value, data?.sessionId)
+        if (this.muteCacheLogs && ['timetable', 'electedLessons', 'yixuanData', 'lessonJSONsCache'].includes(key)) {
+          return
+        }
         logs.pushLog('cache', `${key} 已更新`)
         return
       }
@@ -112,7 +116,11 @@ export const useWsStore = defineStore('ws', {
 
       if (type === 'fuckStarted' || type === 'rowStarted' || type === 'profilesStarted' || type === 'yixuanDataStarted' || type === 'timetableStarted' || type === 'withdrawStarted') {
         this.processing = true
-        logs.pushLog('log', type === 'withdrawStarted' ? '开始退课' : '任务开始执行')
+        if (type === 'withdrawStarted') {
+          this.muteCacheLogs = true
+          return
+        }
+        logs.pushLog('log', '任务开始执行')
         return
       }
 
@@ -147,9 +155,19 @@ export const useWsStore = defineStore('ws', {
         return
       }
 
+      if (type === 'withdrawResult') {
+        this.processing = false
+        course.finishWithdraw(data)
+        return
+      }
+
       if (type === 'withdrawEnded') {
         this.processing = false
-        logs.pushLog('good', '退课流程结束')
+        return
+      }
+
+      if (type === 'withdrawRefreshEnded') {
+        this.muteCacheLogs = false
         return
       }
 

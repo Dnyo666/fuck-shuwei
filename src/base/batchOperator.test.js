@@ -5,6 +5,7 @@ const {
   normalizeProfileId,
   buildOperatorBody,
   classifyOperatorText,
+  shortenOperatorDetail,
 } = require('./batchOperator')
 
 test('buildOperatorBody elects with official form fields', () => {
@@ -36,4 +37,11 @@ test('classifyOperatorText maps official response phrases', () => {
   assert.equal(classifyOperatorText('人数已满'), 'full')
   assert.equal(classifyOperatorText('你已经选过该课程'), 'selected')
   assert.equal(classifyOperatorText('403'), 'overtime')
+})
+
+test('classifyOperatorText prefers withdraw success over leftover clash chrome', () => {
+  assert.equal(classifyOperatorText('退课成功 检测冲突提示', 'withdraw'), 'success')
+  assert.equal(classifyOperatorText('退课失败 时间冲突', 'withdraw'), 'clash')
+  assert.equal(classifyOperatorText('不在退课开放时间', 'withdraw'), 'noopen')
+  assert.equal(shortenOperatorDetail('页头 导航 退课失败：时间冲突 页脚'), '退课失败：时间冲突 页脚')
 })

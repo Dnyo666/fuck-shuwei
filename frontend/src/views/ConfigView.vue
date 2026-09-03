@@ -8,10 +8,13 @@
     <n-card>
       <n-form :model="store.settings" label-placement="top" size="large">
         <n-grid :cols="12" :x-gap="16" :y-gap="14">
-          <n-form-item-gi :span="12" label="请求延迟（ms）">
-            <div class="w-full flex flex-wrap items-center gap-4">
-              <n-slider v-model:value="delayValue" :min="0" :max="2000" :step="100" class="flex-1" />
-              <n-tag :bordered="false" type="info">{{ delayValue }}ms</n-tag>
+          <n-form-item-gi :span="12" label="选课 / 退课提交间隔（ms）">
+            <div class="w-full space-y-3">
+              <div class="flex flex-wrap items-center gap-4">
+                <n-slider v-model:value="delayValue" :min="0" :max="2000" :step="100" class="flex-1" />
+                <n-tag :bordered="false" type="info">{{ delayValue }}ms</n-tag>
+              </div>
+              <div class="text-sm text-slate-600">只作用在抢课提交之后。退课、拉课表、刷新轮次不再等待。</div>
             </div>
           </n-form-item-gi>
           <n-form-item-gi :span="12" label="TLS 证书">

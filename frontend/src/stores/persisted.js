@@ -238,7 +238,18 @@ export const usePersistedStore = defineStore('persisted', {
         cookie: session.cookie || '',
         electionProfiles,
         lessonJSONsCache,
+        timetableMeta: {
+          semesterId: String(session.timetable?.semesterId || ''),
+          studentId: String(session.timetable?.studentId || session.timetable?.ids || ''),
+        },
       }
+    },
+    restoreLessonSnapshot(snapshot) {
+      const session = this.activeSession
+      if (!session || !snapshot) return
+      session.electedLessons = Array.isArray(snapshot.electedLessons) ? snapshot.electedLessons : []
+      session.yixuanData = Array.isArray(snapshot.yixuanData) ? snapshot.yixuanData : []
+      session.timetable = markRaw(normalizeTimetable(snapshot.timetable))
     },
     buildCourseBaseConfig() {
       const session = this.activeSession

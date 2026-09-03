@@ -28,7 +28,7 @@
     "dev:fe": "vite",
     "build:fe": "vite build",
     "preview:fe": "vite preview --port 4173",
-    "test": "node --test src/base/mergeLessons.test.js src/base/batchOperator.test.js",
+    "test": "node --test src/base/*.test.js",
     "build": "esbuild ./src/server.js --bundle --minify --outfile=./dist/dist.js --platform=node",
     "build:win": "npm run build && npx --yes pkg . --targets node18-win-x64 --output ./dist/$(node -p \"require('./package.json').name\").exe",
     "build:mac": "npm run build && pkg . --targets node18-macos-x64",

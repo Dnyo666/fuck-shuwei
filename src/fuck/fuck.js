@@ -4,6 +4,7 @@ const {
   buildOperatorBody,
   classifyOperatorText,
   normalizeProfileId,
+  shortenOperatorDetail,
 } = require('../base/batchOperator')
 
 function responseText(data) {
@@ -35,11 +36,16 @@ async function batchOperator(profileId, lessonId, cookie, request, elect) {
   $('script').remove()
   $('style').remove()
   const text = $('body').text().replace(/\s+/g, ' ').trim()
-  return classifyOperatorText(text)
+  const mode = elect ? 'elect' : 'withdraw'
+  return {
+    result: classifyOperatorText(text, mode),
+    detail: shortenOperatorDetail(text),
+  }
 }
 
 module.exports = async function fuck(profileId, id, cookie, request) {
-  return batchOperator(profileId, id, cookie, request, true)
+  const parsed = await batchOperator(profileId, id, cookie, request, true)
+  return parsed.result
 }
 
 module.exports.batchOperator = batchOperator

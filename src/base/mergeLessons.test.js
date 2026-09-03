@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { mergeLessons, identityTokens, lessonListKey } = require('./mergeLessons')
+const { mergeLessons, identityTokens, lessonListKey, dropLessons } = require('./mergeLessons')
 
 test('mergeLessons joins elected id rows with timetable no rows', () => {
   const merged = mergeLessons([
@@ -45,4 +45,14 @@ test('lessonListKey stays unique when rows share a title', () => {
   const a = lessonListKey({ name: '同名课' }, 0)
   const b = lessonListKey({ name: '同名课' }, 1)
   assert.notEqual(a, b)
+})
+
+test('dropLessons removes the matched class and keeps the others', () => {
+  const list = [
+    { id: '473020', no: 'E302138.03', name: 'Linux操作系统' },
+    { id: '472990', no: 'F302159.01', name: 'Office高级应用' },
+  ]
+  const next = dropLessons(list, { id: 'l472990' })
+  assert.equal(next.length, 1)
+  assert.equal(next[0].no, 'E302138.03')
 })

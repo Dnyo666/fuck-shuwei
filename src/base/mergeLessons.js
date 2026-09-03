@@ -27,6 +27,12 @@ function mergeLessonPair(prev, item) {
   }
 }
 
+function dropLessons(list, ref) {
+  const banned = new Set(identityTokens(ref))
+  if (!banned.size) return Array.isArray(list) ? list.slice() : []
+  return (Array.isArray(list) ? list : []).filter((item) => !identityTokens(item).some((token) => banned.has(token)))
+}
+
 function mergeLessons(list) {
   const merged = []
   const indexByToken = new Map()
@@ -51,4 +57,5 @@ module.exports = {
   lessonListKey,
   mergeLessonPair,
   mergeLessons,
+  dropLessons,
 }
