@@ -4,6 +4,7 @@ import {
   createEmptySession,
   loadPersistedState,
   normalizeSettings,
+  normalizeTimetable,
   savePersistedState,
 } from '@/shared/persist'
 import { safeJsonParse } from '@/shared/utils'
@@ -16,6 +17,8 @@ function withRawLessonCache(session) {
   return {
     ...session,
     lessonJSONsCache: rawLessonCache(session.lessonJSONsCache),
+    electedLessons: Array.isArray(session.electedLessons) ? session.electedLessons : [],
+    timetable: markRaw(normalizeTimetable(session.timetable)),
   }
 }
 
@@ -81,6 +84,8 @@ export const usePersistedStore = defineStore('persisted', {
         sessions: this.sessions.map((session) => ({
           ...session,
           lessonJSONsCache: toRaw(session.lessonJSONsCache || {}),
+          electedLessons: toRaw(session.electedLessons || []),
+          timetable: toRaw(session.timetable || normalizeTimetable()),
         })),
         activeSessionId: this.activeSessionId,
         courseLoop: this.courseLoop,
@@ -200,6 +205,16 @@ export const usePersistedStore = defineStore('persisted', {
       if (key === 'yixuanData') {
         const parsed = typeof value === 'string' ? safeJsonParse(value, []) : value
         session.yixuanData = Array.isArray(parsed) ? parsed : []
+        return
+      }
+      if (key === 'electedLessons') {
+        const parsed = typeof value === 'string' ? safeJsonParse(value, []) : value
+        session.electedLessons = Array.isArray(parsed) ? parsed : []
+        return
+      }
+      if (key === 'timetable') {
+        const parsed = typeof value === 'string' ? safeJsonParse(value, {}) : value
+        session.timetable = markRaw(normalizeTimetable(parsed))
       }
     },
     buildCommonBaseConfig() {
@@ -244,6 +259,8 @@ export const usePersistedStore = defineStore('persisted', {
       return {
         ...this.buildCommonBaseConfig(),
         count: session?.scheduleCount || '1',
+        electedLessons: toRaw(session?.electedLessons || []),
+        timetable: toRaw(session?.timetable || normalizeTimetable()),
       }
     },
   },

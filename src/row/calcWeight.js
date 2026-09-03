@@ -51,6 +51,8 @@ module.exports = function calcWeight(
             no: first.no,
             teachers: teachers || first.teachers,
             teachClassName: first.teachClassName,
+            courseTypeName: first.courseTypeName,
+            kind: first.kind,
             arrangeInfo,
           },
         ],

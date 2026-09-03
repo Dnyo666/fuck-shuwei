@@ -26,30 +26,29 @@ const { USER_AGENT } = require('./probe')
   })
 }
 
- function getLessonsFromNo(lessonJSONs, userLessonNo) {
-  return userLessonNo.map((no) => {
-
-
-    const matches = lessonJSONs.filter((l) => l.no === no)
-
-    if (matches.length === 0) {
-      throw new Error('无开课信息' + no)
-    }
-
-    const lessons = matches.map((match) => ({
-      id: match.id,
-      name: match.name,
-      no: match.no,
-      teachers: match.teachers,
-      teachClassName: match.teachClassName,
-      arrangeInfo: match.arrangeInfo,
-    }))
-
-    return {
+function getLessonsFromNo(lessonJSONs, userLessonNo) {
+  const pool = Array.isArray(lessonJSONs) ? lessonJSONs : []
+  const out = []
+  for (const raw of userLessonNo || []) {
+    const no = String(raw || '').trim()
+    if (!no) continue
+    const matches = pool.filter((lesson) => String(lesson?.no || '') === no)
+    if (!matches.length) continue
+    out.push({
       code: no,
-      lessons: lessons,
-    }
-  })
+      lessons: matches.map((match) => ({
+        id: match.id,
+        name: match.name,
+        no: match.no,
+        teachers: match.teachers,
+        teachClassName: match.teachClassName,
+        courseTypeName: match.courseTypeName,
+        kind: match.kind,
+        arrangeInfo: match.arrangeInfo,
+      })),
+    })
+  }
+  return out
 }
 
  function getLessonJSONs(lessonDatas) {
@@ -140,6 +139,22 @@ async function visit(href, cookie, request) {
   }
 }
 
+async function visitPost(href, cookie, request, body) {
+  if (!request) {
+    throw new Error('request client missing')
+  }
+  const response = await request.post(href, body, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      Cookie: cookie,
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    validateStatus: () => true,
+  })
+  return response.data
+}
+
 function zyyo_delay(zyyo_ms) {
   return new Promise((resolve) => setTimeout(resolve, zyyo_ms))
 }
@@ -196,6 +211,7 @@ async function getElectedLessonNos(config) {
 
 module.exports = {
   visit,
+  visitPost,
   zyyo_delay,
   mergeArrays,
   createEmptySchedule,

@@ -26,6 +26,22 @@ export const useCourseStore = defineStore('course', {
       const config = persisted.buildCourseBaseConfig()
       return { type: 'getProfiles', config }
     },
+    buildFetchTimetablePayload() {
+      const persisted = usePersistedStore()
+      const config = persisted.buildCourseBaseConfig()
+      return { type: 'getTimetable', config }
+    },
+    buildWithdrawPayload(lessonId) {
+      const persisted = usePersistedStore()
+      const config = persisted.buildCourseBaseConfig()
+      return {
+        type: 'withdrawLesson',
+        config: {
+          ...config,
+          lessonId: String(lessonId || '').replace(/^l/, '').trim(),
+        },
+      }
+    },
     buildStartPayload() {
       const persisted = usePersistedStore()
       const session = persisted.activeSession

@@ -6,7 +6,8 @@ const { exec, execFile } = require('child_process')
 const { startMainProcess } = require('./fuck/main.js')
 const { startScheduleProcess } = require('./row/main.js')
 const { startBaseProcess } = require('./base/main.js')
-const { getElectedLessonNos } = require('./base/tool.js')
+const { startTimetableProcess } = require('./base/getTimetable.js')
+const { startWithdrawProcess } = require('./base/withdrawLesson.js')
 const {
   prepareLoginSession,
   refreshCaptchaImage,
@@ -213,18 +214,18 @@ wss.on('connection', (ws) => {
         ws.send(JSON.stringify({ type: 'profilesStarted' }))
         message.config.logger = taskLogger
         await startBaseProcess(message.config)
-      } else if (message.type === 'getYixuanData') {
+      } else if (message.type === 'getTimetable' || message.type === 'getYixuanData') {
         clients.get(clientId).status = 'running'
-        ws.send(JSON.stringify({ type: 'yixuanDataStarted' }))
+        ws.send(JSON.stringify({
+          type: message.type === 'getTimetable' ? 'timetableStarted' : 'yixuanDataStarted',
+        }))
         message.config.logger = taskLogger
-        const baseConfig = await startBaseProcess(message.config)
-        const { nos, missingIds } = await getElectedLessonNos(baseConfig)
-        taskLogger.sendData('cache', { key: 'yixuanData', value: JSON.stringify(nos) })
-        if (missingIds.length > 0) {
-          logger.sendData('log', `已选课程解析完成，未映射课程数: ${missingIds.length}`)
-        } else {
-          logger.sendData('log', `已选课程解析完成，共 ${nos.length} 门`)
-        }
+        await startTimetableProcess(message.config)
+      } else if (message.type === 'withdrawLesson') {
+        clients.get(clientId).status = 'running'
+        ws.send(JSON.stringify({ type: 'withdrawStarted' }))
+        message.config.logger = taskLogger
+        await startWithdrawProcess(message.config)
       }
     } catch (error) {
       logger.sendData('error', `消息处理错误: ${error.message || error.toString()}`)
@@ -245,8 +246,12 @@ wss.on('connection', (ws) => {
         ws.send(JSON.stringify({ type: 'scheduleEnded' }))
       } else if (message && message.type === 'getProfiles') {
         ws.send(JSON.stringify({ type: 'profilesEnded' }))
-      } else if (message && message.type === 'getYixuanData') {
-        ws.send(JSON.stringify({ type: 'yixuanDataEnded' }))
+      } else if (message && (message.type === 'getTimetable' || message.type === 'getYixuanData')) {
+        ws.send(JSON.stringify({
+          type: message.type === 'getTimetable' ? 'timetableEnded' : 'yixuanDataEnded',
+        }))
+      } else if (message && message.type === 'withdrawLesson') {
+        ws.send(JSON.stringify({ type: 'withdrawEnded' }))
       }
     }
   })
@@ -286,6 +291,7 @@ async function updateTable() {
   console.log(`静态服务器: http://localhost:${HTTP_PORT}`)
   console.log(`浏览器打开上面的链接`)
   console.log(`不要关闭当前窗口`)
+  if (process.env.SKIP_OPEN) return
   const url = `http://localhost:${HTTP_PORT}`
   if (process.platform === 'win32') {
     exec(`start "" "${url}"`, { shell: true })

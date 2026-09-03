@@ -27,7 +27,7 @@ function createRequest({ url, delay, insecureTls }) {
     (response) => {
       try {
         const requestUrl = response.config.url || ''
-        if (/login(Ext|Page)?\.action/i.test(requestUrl)) {
+        if (/login(Ext|Page)?\.action/i.test(requestUrl) || /courseTableForStd/i.test(requestUrl)) {
           return delayResponse(response)
         }
 
@@ -37,9 +37,10 @@ function createRequest({ url, delay, insecureTls }) {
         }
         const $ = cheerio.load(html)
         const text = $('body').text()
-        const loginText = text.includes('过期') || text.includes('登录')
+        const expired = text.includes('过期') && (text.includes('登录') || /name=["']username["']/.test(html))
+        const loginForm = /name=["']username["']/.test(html) && /name=["']password["']/.test(html)
 
-        if (loginText) {
+        if (expired || loginForm) {
           return delayError(new Error('检测到登录过期...'))
         }
 

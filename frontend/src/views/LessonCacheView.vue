@@ -69,9 +69,10 @@
 
 <script setup>
 import { computed, h, ref, watch } from 'vue'
-import { useMessage, NButton, NCard, NDataTable, NInput, NModal, NScrollbar, NSelect, NTabPane, NTabs } from 'naive-ui'
+import { useMessage, NButton, NCard, NDataTable, NInput, NModal, NScrollbar, NSelect, NTabPane, NTabs, NTag } from 'naive-ui'
 import { usePersistedStore } from '@/stores/persisted'
 import { normalizeLessonJSONs } from '@/shared/utils'
+import { isElectedLesson } from '@/shared/timetable'
 
 const store = usePersistedStore()
 const message = useMessage()
@@ -219,6 +220,15 @@ const columns = [
     },
   },
   { title: 'period', key: 'period', width: 80 },
+  {
+    title: '已选',
+    key: '_elected',
+    width: 80,
+    render(row) {
+      if (!isElectedLesson(session.value, row)) return '-'
+      return h(NTag, { size: 'small', bordered: false, type: 'info' }, { default: () => '已选' })
+    },
+  },
   { title: 'weekHour', key: 'weekHour', width: 90 },
   {
     title: 'arrangeInfo',

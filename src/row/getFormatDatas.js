@@ -4,12 +4,19 @@ const { mergeArrays } = require('../base/tool')
 // 格式化单个排课信息为二维数组
 function processArrange(arrangeInfo) {
   const result = Array.from({ length: 16 }, () => Array(91).fill(0)) // 16周*91节初始化为0
-  const { weekDay, weekState, startUnit, endUnit } = arrangeInfo
-  const weekBits = weekState.slice(1, 17) // 取前16位，表示每周是否有课
+  const weekDay = Number(arrangeInfo?.weekDay || 0)
+  const weekState = String(arrangeInfo?.weekState || '')
+  const startUnit = Number(arrangeInfo?.startUnit || 0)
+  const endUnit = Number(arrangeInfo?.endUnit || 0)
+  const weekBits = weekState.slice(1, 17)
+
+  if (weekDay < 1 || weekDay > 7 || startUnit < 1 || endUnit < startUnit) {
+    return result
+  }
 
   for (let week = 0; week < 16; week++) {
     if (weekBits[week] === '1') {
-      const dayIndex = weekDay - 1 // 星期几
+      const dayIndex = weekDay - 1
       for (let unit = startUnit; unit <= endUnit; unit++) {
         const unitIndex = unit - 1 // 第几节课
         const position = dayIndex * 13 + unitIndex // 计算在一周中的位置
@@ -29,7 +36,8 @@ module.exports = function getformatDatas(groupedLessons) {
     formatDatas: group.lessons.map((lesson) => {
       // 合并一个代码下某一门课的多个时间节点为同一数组
       let mergedResult = Array.from({ length: 16 }, () => Array(91).fill(0))
-      lesson.arrangeInfo.forEach((arrange) => {
+      const arrangeInfo = Array.isArray(lesson.arrangeInfo) ? lesson.arrangeInfo : []
+      arrangeInfo.forEach((arrange) => {
         const singleArr = processArrange(arrange) // 单个排课信息转为二维数组
         mergedResult = mergeArrays(mergedResult, singleArr) // 合并到总数组
       })

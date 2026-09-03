@@ -51,7 +51,7 @@ export const useScheduleStore = defineStore('schedule', {
     buildFetchYixuanDataPayload() {
       const persisted = usePersistedStore()
       const config = persisted.buildScheduleBaseConfig()
-      return { type: 'getYixuanData', config }
+      return { type: 'getTimetable', config }
     },
     buildStartPayload() {
       const persisted = usePersistedStore()

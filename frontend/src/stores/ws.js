@@ -110,9 +110,9 @@ export const useWsStore = defineStore('ws', {
         return
       }
 
-      if (type === 'fuckStarted' || type === 'rowStarted' || type === 'profilesStarted' || type === 'yixuanDataStarted') {
+      if (type === 'fuckStarted' || type === 'rowStarted' || type === 'profilesStarted' || type === 'yixuanDataStarted' || type === 'timetableStarted' || type === 'withdrawStarted') {
         this.processing = true
-        logs.pushLog('log', '任务开始执行')
+        logs.pushLog('log', type === 'withdrawStarted' ? '开始退课' : '任务开始执行')
         return
       }
 
@@ -141,9 +141,15 @@ export const useWsStore = defineStore('ws', {
         return
       }
 
-      if (type === 'yixuanDataEnded') {
+      if (type === 'yixuanDataEnded' || type === 'timetableEnded') {
         this.processing = false
-        logs.pushLog('good', '已选课程获取结束')
+        logs.pushLog('good', type === 'timetableEnded' ? '课表与已选获取结束' : '已选课程获取结束')
+        return
+      }
+
+      if (type === 'withdrawEnded') {
+        this.processing = false
+        logs.pushLog('good', '退课流程结束')
         return
       }
 

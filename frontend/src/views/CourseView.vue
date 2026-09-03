@@ -23,7 +23,7 @@
     <n-modal
       v-model:show="lessonsConfigOpen"
       preset="card"
-      title="配置课程列表"
+      title="配置待抢课程"
       :bordered="false"
       :trap-focus="false"
       :auto-focus="false"
@@ -31,7 +31,7 @@
       style="width: 980px; max-width: 96vw"
     >
       <div class="text-xs text-slate-600 -mt-2 mb-4">
-        从当前轮次课程里点选，或手填课程序号 / 课程 ID。上到下为优先级。
+        左边点选或手填加入待抢列表，上到下为抢课优先级。已选课在主页课程卡片里退课。
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="rounded-2xl border border-black/10 bg-white/60 p-3 min-h-[420px] flex flex-col">
@@ -45,13 +45,16 @@
           <n-scrollbar class="mt-2 flex-1 min-h-0">
             <div class="space-y-2 pr-1">
               <button
-                v-for="item in filteredCatalog"
-                :key="catalogKey(item)"
+                v-for="(item, idx) in filteredCatalog"
+                :key="lessonListKey(item, idx)"
                 type="button"
                 class="w-full text-left rounded-xl border border-black/10 bg-white/80 px-3 py-2 hover:bg-white"
                 @click="addLessonFromCatalog(item)"
               >
-                <div class="text-sm font-medium text-slate-900">{{ item.name || item.no || item.id }}</div>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="text-sm font-medium text-slate-900">{{ item.name || item.no || item.id }}</div>
+                  <n-tag v-if="isCatalogElected(item)" size="small" :bordered="false" type="info">已选</n-tag>
+                </div>
                 <div class="mt-1 text-[11px] text-slate-500">
                   {{ item.no || item.id }}
                   <span v-if="item.teachers"> · {{ item.teachers }}</span>
@@ -74,7 +77,7 @@
             <n-input v-model:value="manualLesson" size="small" placeholder="手填课程序号或 ID，例如 F302159.01" @keyup.enter="addManualLesson" />
             <n-button size="small" type="primary" @click="addManualLesson">添加</n-button>
           </div>
-          <div class="mt-2 text-[11px] text-slate-500">已选 {{ session.lessonsText.length }} 门</div>
+          <div class="mt-2 text-[11px] text-slate-500">待抢 {{ session.lessonsText.length }} 门，上到下先抢</div>
           <n-scrollbar class="mt-2 flex-1 min-h-0">
             <div class="space-y-2 pr-1">
               <div
@@ -98,7 +101,7 @@
                 </div>
               </div>
               <div v-if="session.lessonsText.length === 0" class="py-10 text-center text-sm text-slate-500">
-                还没有添加课程
+                还没有待抢课程
               </div>
             </div>
           </n-scrollbar>
@@ -169,6 +172,56 @@
         </n-card>
 
         <n-card>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-sm font-semibold">周课表</div>
+              <div class="mt-1 text-xs text-slate-600">
+                {{ timetableHint }}
+              </div>
+            </div>
+            <n-button size="small" secondary :disabled="ws.processing" @click="fetchTimetable">
+              拉取课表
+            </n-button>
+          </div>
+          <div class="mt-4">
+            <TimetableGrid v-if="timetableActivities.length" :activities="timetableActivities" />
+            <div v-else class="py-10 text-center text-sm text-slate-500">
+              还没有周课表。登录后点「拉取课表」，必修和已选选修会画在同一张表上。
+            </div>
+          </div>
+        </n-card>
+
+        <n-card class="min-h-0">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-sm font-semibold">课程</div>
+              <div class="mt-1 text-xs text-slate-600">
+                {{ courseHint }}
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <n-button size="small" secondary :disabled="ws.processing" @click="fetchTimetable">
+                拉取课表
+              </n-button>
+              <n-button size="small" secondary @click="lessonsConfigOpen = true">配置待抢</n-button>
+            </div>
+          </div>
+
+          <div class="mt-4 text-xs font-medium text-slate-700">已选 {{ electedLessons.length }}</div>
+          <div class="mt-2">
+            <ElectedLessonList
+              :lessons="electedLessons"
+              show-withdraw
+              :withdrawing="ws.processing"
+              @withdraw="confirmWithdraw"
+            />
+          </div>
+
+          <div class="mt-5 text-xs font-medium text-slate-700">待抢 {{ session.lessonsText.length }}</div>
+          <div class="mt-2 text-xs text-slate-600 leading-relaxed">{{ lessonsPreview }}</div>
+        </n-card>
+
+        <n-card>
           <n-form :model="session" label-placement="top" size="large">
             <n-grid :cols="12" :x-gap="16" :y-gap="14">
               <n-form-item-gi :span="12" label="抢课模式">
@@ -197,18 +250,6 @@
             </n-grid>
           </n-form>
         </n-card>
-
-        <n-card class="min-h-0">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="text-sm font-semibold">课程列表</div>
-              <div class="mt-1 text-xs text-slate-600">共 {{ session.lessonsText.length }} 条，可从课程列表点选或手填序号 / ID</div>
-            </div>
-            <n-button size="small" secondary @click="lessonsConfigOpen = true">配置</n-button>
-          </div>
-
-          <div class="mt-3 text-xs text-slate-600 leading-relaxed line-clamp-6">{{ lessonsPreview }}</div>
-        </n-card>
       </div>
     </n-scrollbar>
   </div>
@@ -217,16 +258,20 @@
 <script setup>
 import { computed, h, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMessage, NAlert, NButton, NCard, NDataTable, NForm, NFormItemGi, NGrid, NInput, NModal, NRadio, NRadioGroup, NScrollbar, NSelect, NSwitch, NTag } from 'naive-ui'
+import { useDialog, useMessage, NAlert, NButton, NCard, NDataTable, NForm, NFormItemGi, NGrid, NInput, NModal, NRadio, NRadioGroup, NScrollbar, NSelect, NSwitch, NTag } from 'naive-ui'
 import { useCourseStore } from '@/stores/course'
 import { usePersistedStore } from '@/stores/persisted'
 import { useWsStore } from '@/stores/ws'
 import { findLessonInCache, normalizeLessonJSONs } from '@/shared/utils'
+import { collectElectedLessons, identityTokens, kindSummary, lessonListKey, lessonNumericId } from '@/shared/timetable'
+import TimetableGrid from '@/components/TimetableGrid.vue'
+import ElectedLessonList from '@/components/ElectedLessonList.vue'
 
 const persisted = usePersistedStore()
 const ws = useWsStore()
 const course = useCourseStore()
 const message = useMessage()
+const dialog = useDialog()
 const router = useRouter()
 const session = computed(() => persisted.activeSession)
 
@@ -277,13 +322,42 @@ const filteredCatalog = computed(() => {
   })
 })
 
+const electedLessons = computed(() => collectElectedLessons(session.value))
+const electedTokens = computed(() => {
+  const set = new Set()
+  for (const item of electedLessons.value) {
+    for (const token of identityTokens(item)) set.add(token)
+  }
+  return set
+})
+
+const timetableActivities = computed(() => (
+  Array.isArray(session.value?.timetable?.activities) ? session.value.timetable.activities : []
+))
+
+const timetableHint = computed(() => {
+  if (!timetableActivities.value.length) return '官方 13 行周课表，含午休行'
+  return `共 ${timetableActivities.value.length} 段`
+})
+
+const courseHint = computed(() => {
+  const elected = electedLessons.value.length
+  const pending = Array.isArray(session.value?.lessonsText)
+    ? session.value.lessonsText.filter((value) => String(value || '').trim()).length
+    : 0
+  const kinds = kindSummary(electedLessons.value)
+  const electedPart = elected ? `已选 ${elected} 门${kinds ? ` · ${kinds}` : ''}` : '还没有已选'
+  return `${electedPart} · 待抢 ${pending} 门`
+})
+
 const lessonsPreview = computed(() => {
   const list = Array.isArray(session.value?.lessonsText) ? session.value.lessonsText : []
   const items = list
     .map((v) => String(v || '').trim())
     .filter(Boolean)
     .slice(0, 12)
-  return items.length > 0 ? items.join('、') : '未配置'
+  if (items.length > 0) return items.join('、')
+  return '还没有待抢课程，点「配置待抢」添加'
 })
 
 const resultsTableMaxHeight = computed(() => {
@@ -320,8 +394,9 @@ const columns = [
   },
 ]
 
-function catalogKey(item) {
-  return [item?.id, item?.no, item?.code, item?.name].filter(Boolean).join('|')
+function isCatalogElected(item) {
+  const set = electedTokens.value
+  return identityTokens(item).some((token) => set.has(token))
 }
 
 function lessonHint(value) {
@@ -353,9 +428,38 @@ function addLessonValue(raw) {
 }
 
 function addLessonFromCatalog(item) {
+  if (isCatalogElected(item)) {
+    message.info('这门已在课表中，退课请用主页课程卡片')
+    return
+  }
   const value = String(item?.no || item?.id || '').trim()
   if (!value) return
   if (addLessonValue(value)) message.success(`已加入 ${item.name || value}`)
+}
+
+function confirmWithdraw(item) {
+  if (!requireCookie()) return
+  const profileId = String(session.value?.courseProfileId || '').trim()
+  if (!/^\d+$/.test(profileId)) {
+    message.warning('先选择选课轮次，退课走当前轮次')
+    return
+  }
+  const lessonId = lessonNumericId(item)
+  if (!lessonId) {
+    message.warning('这门课没有数字课程 ID，无法向教务退课')
+    return
+  }
+  const label = [item?.name, item?.no, item?.kind].filter(Boolean).join(' · ')
+  dialog.warning({
+    title: '确认退课',
+    content: `将从教务退掉「${label}」。课表会立刻更新。`,
+    positiveText: '确认退课',
+    negativeText: '取消',
+    maskClosable: false,
+    onPositiveClick() {
+      ws.sendWs(course.buildWithdrawPayload(lessonId))
+    },
+  })
 }
 
 function addManualLesson() {
@@ -405,6 +509,11 @@ function requireCookie() {
 function fetchProfilesCourse() {
   if (!requireCookie()) return
   ws.sendWs(course.buildFetchProfilesPayload())
+}
+
+function fetchTimetable() {
+  if (!requireCookie()) return
+  ws.sendWs(course.buildFetchTimetablePayload())
 }
 
 function start() {

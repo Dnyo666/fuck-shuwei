@@ -2,6 +2,19 @@ import { nowId, safeJsonParse } from './utils'
 
 const STORAGE_KEY = 'modern-fe:state'
 
+export function normalizeTimetable(raw) {
+  const v = raw && typeof raw === 'object' ? raw : {}
+  return {
+    semesterId: v.semesterId != null ? String(v.semesterId) : '',
+    ids: v.ids != null ? String(v.ids) : v.studentId != null ? String(v.studentId) : '',
+    studentId: v.studentId != null ? String(v.studentId) : v.ids != null ? String(v.ids) : '',
+    source: typeof v.source === 'string' ? v.source : '',
+    fetchedAt: Number(v.fetchedAt) || 0,
+    activities: Array.isArray(v.activities) ? v.activities : [],
+    courses: Array.isArray(v.courses) ? v.courses : [],
+  }
+}
+
 export function normalizeSettings(raw) {
   const v = raw && typeof raw === 'object' ? raw : {}
   return {
@@ -40,6 +53,8 @@ export function createEmptySession(partial) {
     electionProfiles: Array.isArray(v.electionProfiles) ? v.electionProfiles : [],
     lessonJSONsCache: v.lessonJSONsCache && typeof v.lessonJSONsCache === 'object' ? v.lessonJSONsCache : {},
     yixuanData: Array.isArray(v.yixuanData) ? v.yixuanData : [],
+    electedLessons: Array.isArray(v.electedLessons) ? v.electedLessons : [],
+    timetable: normalizeTimetable(v.timetable),
     createdAt: Number(v.createdAt) || Date.now(),
     lastUsedAt: Number(v.lastUsedAt) || Date.now(),
   }

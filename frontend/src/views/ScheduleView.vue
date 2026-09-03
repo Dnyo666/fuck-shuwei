@@ -60,17 +60,35 @@
             <div class="rounded-2xl border border-black/10 bg-white/60 p-5">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <div class="text-sm font-semibold text-slate-900">已选课程</div>
-                  <div class="mt-1 text-xs text-slate-600">共 {{ session.yixuanData.length }} 条</div>
+                  <div class="text-sm font-semibold text-slate-900">已选 / 已占</div>
+                  <div class="mt-1 text-xs text-slate-600">{{ electedHint }}</div>
                 </div>
                 <div class="flex items-center gap-2">
                   <n-button size="small" secondary :disabled="ws.processing" @click="fetchYixuanDataSchedule()">
-                    拉取已选
+                    拉取课表
                   </n-button>
                   <n-button size="small" secondary @click="yixuanConfigOpen = true">配置</n-button>
                 </div>
               </div>
-              <div class="mt-4 text-xs text-slate-600 leading-relaxed line-clamp-2">{{ yixuanPreview }}</div>
+              <div class="mt-4 text-xs text-slate-600 leading-relaxed line-clamp-3">{{ yixuanPreview }}</div>
+            </div>
+
+            <div class="lg:col-span-2 rounded-2xl border border-black/10 bg-white/60 p-5">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-slate-900">周课表（已占格子）</div>
+                  <div class="mt-1 text-xs text-slate-600">必修、实习和已选选修都会占住这些时段，排课方案不会再叠上去</div>
+                </div>
+                <n-button size="small" secondary :disabled="ws.processing" @click="fetchYixuanDataSchedule()">
+                  刷新课表
+                </n-button>
+              </div>
+              <div class="mt-4">
+                <TimetableGrid v-if="timetableActivities.length" :activities="timetableActivities" />
+                <div v-else class="py-10 text-center text-sm text-slate-500">
+                  还没有周课表。先点「拉取课表」，必修和实习才会进入占用。
+                </div>
+              </div>
             </div>
 
             <div class="lg:col-span-2 rounded-2xl border border-black/10 bg-white/60 p-5">
@@ -162,7 +180,7 @@
           <div class="flex items-start justify-between gap-3">
             <div>
               <div class="text-base font-semibold">配置已选课程</div>
-              <div class="mt-1 text-xs text-slate-600">必须是课程序号</div>
+              <div class="mt-1 text-xs text-slate-600">课程序号。必修和已选选修都会占格，可手改</div>
             </div>
             <div class="flex items-center gap-2">
             <n-button secondary size="small" :disabled="ws.processing" @click="fetchYixuanDataSchedule()">
@@ -182,7 +200,8 @@
               >
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="min-w-[180px] flex-1">
-                    <n-input v-model:value="session.yixuanData[idx]" size="small" placeholder="课程序号（如 001.1.1）" />
+                    <n-input v-model:value="session.yixuanData[idx]" size="small" placeholder="课程序号（如 E302138.03）" />
+                    <div v-if="yixuanHint(no)" class="mt-1 text-[11px] text-slate-500">{{ yixuanHint(no) }}</div>
                   </div>
                   <div class="flex items-center gap-1 shrink-0">
                     <n-button size="tiny" secondary :disabled="idx === 0" @click="moveYixuanUp(idx)">上移</n-button>
@@ -308,16 +327,16 @@
 
                     <div class="space-y-2">
                       <div
-                        v-for="p in periods"
+                        v-for="p in periodLabels"
                         :key="p"
-                        class="h-[44px] rounded-xl bg-black/5 flex items-center justify-center text-[11px] text-slate-600 tabular-nums"
+                        class="h-[44px] rounded-xl bg-black/5 flex items-center justify-center text-[11px] text-slate-600"
                       >
                         {{ p }}
                       </div>
                     </div>
 
                     <div v-for="dayIndex in 7" :key="dayIndex" class="grid grid-rows-13 gap-2 relative">
-                      <div v-for="p in periods" :key="p" class="h-[44px] rounded-xl bg-black/5" />
+                      <div v-for="p in periodLabels" :key="p" class="h-[44px] rounded-xl bg-black/5" />
 
                       <div v-for="b in blocksByDay[dayIndex]" :key="b.id" class="absolute left-0 right-0 px-2" :style="blockStyle(b)">
                         <button
@@ -459,6 +478,8 @@ import {
 import { usePersistedStore } from '@/stores/persisted'
 import { useScheduleStore } from '@/stores/schedule'
 import { useWsStore } from '@/stores/ws'
+import { PERIOD_LABELS, collectElectedLessons, kindSummary, periodRangeLabel } from '@/shared/timetable'
+import TimetableGrid from '@/components/TimetableGrid.vue'
 
 const persisted = usePersistedStore()
 const ws = useWsStore()
@@ -490,7 +511,26 @@ const lessonCodePreview = computed(() => {
   return items.length > 0 ? items.join('、') : '未配置'
 })
 
+const electedLessons = computed(() => collectElectedLessons(session.value))
+
+const timetableActivities = computed(() => (
+  Array.isArray(session.value?.timetable?.activities) ? session.value.timetable.activities : []
+))
+
+const electedHint = computed(() => {
+  const nos = Array.isArray(session.value?.yixuanData) ? session.value.yixuanData.length : 0
+  if (!electedLessons.value.length && !nos) return '还没有已占课程'
+  const kinds = kindSummary(electedLessons.value)
+  return `共 ${electedLessons.value.length || nos} 门${kinds ? ` · ${kinds}` : ''}`
+})
+
 const yixuanPreview = computed(() => {
+  if (electedLessons.value.length) {
+    return electedLessons.value
+      .slice(0, 8)
+      .map((item) => [item.kind, item.name || item.no].filter(Boolean).join(' '))
+      .join('、')
+  }
   const list = Array.isArray(session.value?.yixuanData) ? session.value.yixuanData : []
   const items = list
     .map((v) => String(v || '').trim())
@@ -619,7 +659,15 @@ function deleteYixuan(idx) {
 }
 
 const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const periods = Array.from({ length: 13 }, (_, i) => i + 1)
+const periodLabels = PERIOD_LABELS
+
+function yixuanHint(no) {
+  const token = String(no || '').trim()
+  if (!token) return ''
+  const hit = electedLessons.value.find((item) => String(item?.no || '') === token)
+  if (!hit) return ''
+  return [hit.kind, hit.name, hit.teachers].filter(Boolean).join(' · ')
+}
 
 const activePlan = computed(() => {
   if (activePlanIdx.value === null) return null
@@ -685,7 +733,7 @@ const flatLessons = computed(() => {
       no: lesson.no ? String(lesson.no) : '',
       teachers: lesson.teachers ? String(lesson.teachers) : '',
       teachClassName: lesson.teachClassName ? String(lesson.teachClassName) : '',
-      source: '已选',
+      source: lesson.kind || '已选',
       arrangeInfo,
     })
   }
@@ -731,7 +779,7 @@ const blocks = computed(() => {
         dayLabel: days[weekDay - 1] || `周${weekDay}`,
         title: lesson.name || lesson.no || '课程',
         subtitle: [lesson.teachers, lesson.teachClassName].filter(Boolean).join(' · ') || lesson.no,
-        rangeLabel: `第 ${startUnit}-${endUnit} 节`,
+        rangeLabel: periodRangeLabel(startUnit, endUnit),
         source: lesson.source,
         teachers: lesson.teachers,
         teachClassName: lesson.teachClassName,

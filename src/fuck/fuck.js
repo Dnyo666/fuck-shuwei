@@ -1,52 +1,48 @@
 const cheerio = require('cheerio')
 const { USER_AGENT } = require('../base/probe')
+const {
+  buildOperatorBody,
+  classifyOperatorText,
+  normalizeProfileId,
+} = require('../base/batchOperator')
 
-module.exports = async function fuck(profileId, id, cookie, request) {
+function responseText(data) {
+  if (Buffer.isBuffer(data)) return data.toString('utf-8')
+  return String(data || '')
+}
+
+async function batchOperator(profileId, lessonId, cookie, request, elect) {
   if (!request) {
     throw new Error('request client missing')
   }
-  const axios = request
-  //参数是控制台分析源码和请求弄过来的，我也看不懂，照抄吧
-  let timestamp = Date.now()
-  //nice  这傻逼系统url加个事件戳就不会触发点击过快了哈哈哈哈哈哈哈
-  //我zyyo真是天才一个
-  const url = `/eams/stdElectCourse!batchOperator.action?${timestamp}&profileId=${profileId}`
-  const params = `optype=true&operator0=${id}%3Atrue%3A0&lesson0=${id}&schLessonGroup_${id}=undefined`
-  try {
+  const safeProfileId = normalizeProfileId(profileId)
+  const timestamp = Date.now()
+  const url = `/eams/stdElectCourse!batchOperator.action?${timestamp}&profileId=${safeProfileId}`
+  const params = buildOperatorBody(lessonId, elect)
+  const response = await request.post(url, params, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      'User-Agent': USER_AGENT,
+      'x-requested-with': 'XMLHttpRequest',
+      Cookie: cookie,
+    },
+    validateStatus: () => true,
+  })
 
-    const response = await axios.post(url, params, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-        'User-Agent': USER_AGENT,
-        "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "x-requested-with": "XMLHttpRequest",
-        Cookie: cookie,
-      },
-      validateStatus: (status) => true,
-    })
+  const result = responseText(response.data)
+  const $ = cheerio.load(result)
+  $('script').remove()
+  $('style').remove()
+  const text = $('body').text().replace(/\s+/g, ' ').trim()
+  return classifyOperatorText(text)
+}
 
-    const result = response.data.toString('utf-8')
-    const $ = cheerio.load(result)
-    $('script').remove()
-    $('style').remove()
-    const text = $('body').text().replace(/\s+/g, ' ').trim()
+module.exports = async function fuck(profileId, id, cookie, request) {
+  return batchOperator(profileId, id, cookie, request, true)
+}
 
-    if (text.includes('403')) {
-      return 'overtime'
-    } else if (text.includes('冲突')) {
-      return 'clash'
-    } else if (text.includes('人数已满')) {
-      return 'full'
-    } else if (text.includes('成功')) {
-      return 'success'
-    } else if (text.includes('不开放')) {
-      return 'noopen'
-    } else if (text.includes('选过')) {
-      return 'selected'
-    }
-    return text
-  } catch (error) {
-    throw error
-  }
+module.exports.batchOperator = batchOperator
+module.exports.withdraw = function withdraw(profileId, id, cookie, request) {
+  return batchOperator(profileId, id, cookie, request, false)
 }
