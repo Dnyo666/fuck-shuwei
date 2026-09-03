@@ -5,11 +5,17 @@ main分支处于开发中不可用状态，请前往master分支获取稳定的�
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen)  
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-**Zyyo**
+**原作者 Zyyo**
 
 [![个人博客](https://img.shields.io/badge/zyyo.net-blue)](https://zyyo.net)
+
+**二次开发 Dnyo666（浅巷墨黎）**
+
+[![博客](https://img.shields.io/badge/shallow.ink-blue)](https://shallow.ink)
+[![GitHub](https://img.shields.io/badge/GitHub-Dnyo666-black)](https://github.com/Dnyo666)
+
 ## 声明
-此项目为我的个人原创项目，唯一地址https://github.com/ZYYO666/fuck-shuwei
+原作为 Zyyo 的个人项目，地址 https://github.com/ZYYO666/fuck-shuwei 。当前仓库在此基础上由 Dnyo666 二次开发。
 
 
 ## 排课原理
@@ -29,7 +35,21 @@ main分支 正在开发的版本（未经测试）
 master 经过稳定测试的老版本
 
 
+## 二次开发（Dnyo666）
+
+- 多会话：密码登录或导入 Cookie，验证码人工填写，每个学生一套独立缓存
+- 轮次：专业选修、美育、公共任选都会列出，未到开放时间也能先选轮次、先配待抢
+- 周课表与已选：拉取官方 7×13 课表，已选按教学班去重，主页确认后退课
+- 关键词广撒网：待抢可填课程序号或关键词（如「音乐鉴赏 线上」）；开始选课后拉教学班，线上优先于线下，再按校区和余量提交
+
 ## 🛠️ 版本演进
+### 二次开发 2026-09
+
+- 多会话与验证码登录
+- 未开放轮次可配置待抢
+- 官方周课表、已选合并、退课
+- 按教学班「线上 / 线下」关键词展开抢课
+
 ### v6.0 
 
 - 增加排课系统，用户只需要提供课程code便可以根据算法计算出最适合你的课表
@@ -139,6 +159,6 @@ npm run build:win
 
 | 领域     | 技术方案              |
 | -------- | --------------------- |
-| 前端     | Vue3 + Element Plus   |
-| 后端     | NodeJs + Express + WebSocket   |
+| 前端     | Vue 3 + Vite + Naive UI + Tailwind + Pinia   |
+| 后端     | Node.js + Express + WebSocket   |
 

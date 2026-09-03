@@ -9,6 +9,7 @@
                 <div class="h-10 w-10 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 shadow-lg shadow-fuchsia-500/20" />
                 <div class="leading-tight">
                   <div class="text-sm font-semibold tracking-wide">智能选课控制台</div>
+                  <div class="mt-0.5 text-[11px] text-slate-500">原作 Zyyo · 二次开发 Dnyo666</div>
                 </div>
               </div>
               <div class="h-2 w-2 rounded-full" :class="wsDotClass" />

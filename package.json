@@ -2,6 +2,9 @@
   "name": "fuck-shuwei",
   "version": "1.0.0",
   "author": "Zyyo",
+  "contributors": [
+    "Dnyo666 <dnyo666@foxmail.com>"
+  ],
   "license": "ISC",
   "description": "",
   "dependencies": {

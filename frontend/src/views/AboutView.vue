@@ -24,10 +24,9 @@
             </div>
 
             <div>
-              <div class="text-slate-900 font-semibold">作者 Zyyo（需要吹一下）</div>
+              <div class="text-slate-900 font-semibold">原作者 Zyyo</div>
               <div class="mt-2 leading-relaxed">
-                Zyyo 属于那种“想做就能落地”的硬核型开发者：从抓包逆向到算法抽象再到 WebUI，全链路一把梭，把复杂流程做成了能点就跑的工具。
-                你现在看到的缓存机制、轮次复用、排课权重计算这些关键能力，都是他在持续迭代里一点点打磨出来的。
+                Zyyo 从抓包逆向到排课算法再到 WebUI，把树维教务的选课流程做成了能点就跑的客户端。缓存机制、轮次复用、排课权重这些底座都来自他的迭代。
               </div>
               <div class="mt-2 flex flex-wrap items-center gap-3">
                 <a class="text-sky-700 hover:underline" href="https://zyyo.net" target="_blank" rel="noreferrer">https://zyyo.net</a>
@@ -43,6 +42,17 @@
             </div>
 
             <div>
+              <div class="text-slate-900 font-semibold">二次开发 Dnyo666（浅巷墨黎）</div>
+              <div class="mt-2 leading-relaxed">
+                在原作之上补齐多会话登录、完整选课轮次、官方周课表与退课、以及未开放轮次的关键词广撒网。面向成都东软等树维站点的真实页面字段做了对齐。
+              </div>
+              <div class="mt-2 flex flex-wrap items-center gap-3">
+                <a class="text-sky-700 hover:underline" href="https://shallow.ink" target="_blank" rel="noreferrer">https://shallow.ink</a>
+                <a class="text-sky-700 hover:underline" href="https://github.com/Dnyo666" target="_blank" rel="noreferrer">GitHub：Dnyo666</a>
+              </div>
+            </div>
+
+            <div>
               <div class="text-slate-900 font-semibold">技术栈</div>
               <div class="mt-2 leading-relaxed">前端：Vite + Vue 3 + Tailwind CSS + Naive UI + Pinia + Vue Router</div>
               <div class="mt-1 leading-relaxed">后端：Node.js + Express + WebSocket</div>
@@ -53,6 +63,15 @@
               <div class="mt-2 leading-relaxed">后端静态服务 3000，WebSocket 8080。</div>
               <div class="mt-1 leading-relaxed">前端通过 WebSocket 触发流程并消费日志、表格与缓存消息。</div>
             </div>
+          </div>
+        </n-card>
+
+        <n-card title="二次开发更新">
+          <div class="space-y-3 text-sm text-slate-700">
+            <div class="leading-relaxed">多会话：密码登录或导入 Cookie，验证码人工填写，每个学生一套独立缓存。</div>
+            <div class="leading-relaxed">轮次：专业选修、美育、公共任选都会列出，未到开放时间也能先选轮次、先配待抢。</div>
+            <div class="leading-relaxed">课表与已选：拉取官方 7×13 周课表，已选课按教学班去重，主页课程卡片可确认后退课。</div>
+            <div class="leading-relaxed">关键词广撒网：待抢可填课程序号或关键词（如「音乐鉴赏 线上」）。开始选课后拉教学班，线上班优先于线下班，再按校区和余量展开提交。</div>
           </div>
         </n-card>
 
