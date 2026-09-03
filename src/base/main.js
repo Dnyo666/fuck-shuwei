@@ -18,7 +18,7 @@ const startBaseProcess = async (config) => {
 
     await initSelection(config)
 
-    config = await getLesson(config)
+    config = await getLesson(config, { force: true })
 
     return config
   } catch (error) {

@@ -89,6 +89,14 @@ export function identityTokens(item) {
     .filter(Boolean)
 }
 
+export function courseCodeOf(item) {
+  const direct = String(item?.code || '').trim()
+  if (/^[A-Za-z]{1,2}\d{5,6}$/.test(direct)) return direct
+  const no = String(item?.no || '').trim()
+  const match = no.match(/^([A-Za-z]{1,2}\d{5,6})(?:\.|$)/)
+  return match ? match[1] : ''
+}
+
 function mergeLessonPair(prev, item) {
   return {
     ...prev,

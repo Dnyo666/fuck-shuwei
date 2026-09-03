@@ -1,15 +1,19 @@
 const { visit } = require('./tool')
-/* 他妈的你猜我为啥多此一举，因为这傻逼系统不访问一下这个页面，那几个接口都用不了 zyyo注 */
+
 module.exports = async function initSelection(config) {
   const initUrl = `/eams/stdElectCourse!defaultPage.action?electionProfile.id=${config.profileId}`
 
-  try {
-    const res = await visit(initUrl, config.cookie, config.request)
-    if (!res) {
-      throw new Error('选课初始化失败')
-    }
-    config.logger.sendData('log', '选课初始化成功')
-  } catch (error) {
-    throw error
+  const res = await visit(initUrl, config.cookie, config.request)
+  if (!res) {
+    throw new Error('选课初始化失败')
   }
+  const html = String(res)
+  if (/不在选课时间内/.test(html) || (/操作\s*失败/.test(html) && /选课时间/.test(html))) {
+    config.electNotOpen = true
+    config.logger.sendData('log', '当前轮次未开放')
+    return config
+  }
+  config.electNotOpen = false
+  config.logger.sendData('log', '选课初始化成功')
+  return config
 }

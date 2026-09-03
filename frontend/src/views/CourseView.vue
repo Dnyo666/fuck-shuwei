@@ -31,17 +31,17 @@
       style="width: 980px; max-width: 96vw"
     >
       <div class="text-xs text-slate-600 -mt-2 mb-4">
-        左边点选或手填加入待抢列表，上到下为抢课优先级。已选课在主页课程卡片里退课。
+        左边点选或手填加入待抢，上到下先抢。关键词可带教学班用语，例如「音乐鉴赏 线上」或「韩语 某某校区」。开放后拉到列表再点精确班次。
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="rounded-2xl border border-black/10 bg-white/60 p-3 min-h-[420px] flex flex-col">
           <div class="flex flex-wrap items-center gap-2">
-            <n-input v-model:value="catalogQuery" size="small" clearable placeholder="搜索名称 / 序号 / ID / 教师" />
+            <n-input v-model:value="catalogQuery" size="small" clearable placeholder="搜索名称 / 代码 / 序号 / 教师" />
             <n-button size="small" secondary :disabled="ws.processing" @click="fetchProfilesCourse()">
               拉取课程
             </n-button>
           </div>
-          <div class="mt-2 text-[11px] text-slate-500">当前轮次可选 {{ filteredCatalog.length }} / {{ catalogLessons.length }} 门</div>
+          <div class="mt-2 text-[11px] text-slate-500">当前轮次 {{ filteredCatalog.length }} / {{ catalogLessons.length }} 门</div>
           <n-scrollbar class="mt-2 flex-1 min-h-0">
             <div class="space-y-2 pr-1">
               <button
@@ -53,17 +53,22 @@
               >
                 <div class="flex items-start justify-between gap-2">
                   <div class="text-sm font-medium text-slate-900">{{ item.name || item.no || item.id }}</div>
-                  <n-tag v-if="isCatalogElected(item)" size="small" :bordered="false" type="info">已选</n-tag>
+                  <div class="flex shrink-0 items-center gap-1">
+                    <n-tag v-if="classMode(item)" size="small" :bordered="false" :type="classMode(item) === '线上' ? 'success' : 'default'">
+                      {{ classMode(item) }}
+                    </n-tag>
+                    <n-tag v-if="isCatalogElected(item)" size="small" :bordered="false" type="info">已选</n-tag>
+                  </div>
                 </div>
                 <div class="mt-1 text-[11px] text-slate-500">
-                  {{ item.no || item.id }}
+                  {{ item.no || item.code || item.id }}
                   <span v-if="item.teachers"> · {{ item.teachers }}</span>
-                  <span v-if="item.courseTypeName"> · {{ item.courseTypeName }}</span>
+                  <span v-if="item.campusName"> · {{ item.campusName }}</span>
                   <span v-if="item.teachClassName"> · {{ item.teachClassName }}</span>
                 </div>
               </button>
               <div v-if="catalogLessons.length === 0" class="py-10 text-center text-sm text-slate-500">
-                还没有课程缓存。选好轮次后点「拉取课程」。
+                {{ catalogEmptyHint }}
               </div>
               <div v-else-if="filteredCatalog.length === 0" class="py-10 text-center text-sm text-slate-500">
                 没有匹配的课程
@@ -74,7 +79,7 @@
 
         <div class="rounded-2xl border border-black/10 bg-white/60 p-3 min-h-[420px] flex flex-col">
           <div class="flex flex-wrap items-center gap-2">
-            <n-input v-model:value="manualLesson" size="small" placeholder="手填课程序号或 ID，例如 F302159.01" @keyup.enter="addManualLesson" />
+            <n-input v-model:value="manualLesson" size="small" placeholder="课程序号、ID 或关键词，例如 音乐鉴赏 线上" @keyup.enter="addManualLesson" />
             <n-button size="small" type="primary" @click="addManualLesson">添加</n-button>
           </div>
           <div class="mt-2 text-[11px] text-slate-500">待抢 {{ session.lessonsText.length }} 门，上到下先抢</div>
@@ -85,7 +90,7 @@
                 :key="`${idx}-${value}`"
                 class="rounded-xl border border-black/10 bg-white/80 px-3 py-2"
               >
-                <n-input v-model:value="session.lessonsText[idx]" size="small" placeholder="课程序号或 ID" />
+                <n-input v-model:value="session.lessonsText[idx]" size="small" placeholder="课程序号、ID 或关键词" />
                 <div class="mt-1 text-[11px] text-slate-500">{{ lessonHint(value) }}</div>
                 <div class="mt-2 flex items-center gap-1">
                   <n-button size="tiny" secondary :disabled="idx === 0" @click="moveLessonUp(idx)">上移</n-button>
@@ -263,7 +268,8 @@ import { useCourseStore } from '@/stores/course'
 import { usePersistedStore } from '@/stores/persisted'
 import { useWsStore } from '@/stores/ws'
 import { findLessonInCache, normalizeLessonJSONs } from '@/shared/utils'
-import { collectElectedLessons, identityTokens, kindSummary, lessonListKey, lessonNumericId, withdrawResultLabel } from '@/shared/timetable'
+import { classMode, countKeywordMatches, isExactToken } from '@/shared/matchLessons'
+import { collectElectedLessons, courseCodeOf, identityTokens, kindSummary, lessonListKey, lessonNumericId, withdrawResultLabel } from '@/shared/timetable'
 import TimetableGrid from '@/components/TimetableGrid.vue'
 import ElectedLessonList from '@/components/ElectedLessonList.vue'
 
@@ -309,6 +315,10 @@ const catalogLessons = computed(() => {
   const cache = session.value?.lessonJSONsCache || {}
   return normalizeLessonJSONs(id ? cache[id] : null)
 })
+
+const catalogEmptyHint = computed(() => (
+  '还没有教学班。未开放时先填关键词；开放后或开始选课成功拉到列表，再点选精确班次。'
+))
 
 const filteredCatalog = computed(() => {
   const q = catalogQuery.value.trim().toLowerCase()
@@ -396,13 +406,20 @@ const columns = [
 
 function isCatalogElected(item) {
   const set = electedTokens.value
-  return identityTokens(item).some((token) => set.has(token))
+  if (identityTokens(item).some((token) => set.has(token))) return true
+  const code = courseCodeOf(item)
+  if (!code) return false
+  return electedLessons.value.some((row) => courseCodeOf(row) === code)
 }
 
 function lessonHint(value) {
-  const hit = findLessonInCache(catalogLessons.value, value)
-  if (!hit) return '手填项，开始选课时按序号或 ID 匹配'
-  return [hit.name, hit.teachers, hit.courseTypeName, hit.teachClassName].filter(Boolean).join(' · ')
+  const token = String(value || '').trim()
+  const hit = findLessonInCache(catalogLessons.value, token)
+  if (hit) return [hit.name, hit.teachers, hit.courseTypeName, hit.teachClassName].filter(Boolean).join(' · ')
+  if (isExactToken(token)) return '精确班次，开始选课时按序号或 ID 匹配'
+  if (!catalogLessons.value.length) return '关键词，开放后按名称等匹配'
+  const count = countKeywordMatches(catalogLessons.value, token)
+  return count ? `关键词，约 ${count} 个教学班` : '关键词，当前列表没有命中'
 }
 
 function setCourseProfile(id) {

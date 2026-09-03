@@ -178,7 +178,7 @@ function addToCourse(row) {
     message.warning('请先选择学生会话')
     return
   }
-  const value = String(row?.no || row?.id || '').trim()
+  const value = String(row?.no || row?.code || row?.id || '').trim()
   if (!value) return
   const list = Array.isArray(current.lessonsText) ? current.lessonsText.map((item) => String(item)) : []
   if (list.some((item) => item.trim() === value)) {
