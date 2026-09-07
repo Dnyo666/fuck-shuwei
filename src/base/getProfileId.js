@@ -20,20 +20,30 @@ function parseProfileId(html, href) {
   return fromHtml ? fromHtml[1] : ''
 }
 
-function parseOpenStart(text) {
-  const match = String(text || '').match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/)
-  return match ? match[1] : ''
+function parseOpenWindow(text) {
+  const times = [...String(text || '').matchAll(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/g)].map((item) => item[1])
+  return { start: times[0] || '', end: times[1] || '' }
 }
 
-function isOpenNow(hasEnterLink, openTime) {
+function toTimestamp(text) {
+  const ts = Date.parse(String(text || '').replace(' ', 'T'))
+  return Number.isFinite(ts) ? ts : NaN
+}
+
+function isOpenNow(hasEnterLink, openTime, now = Date.now()) {
+  const { start, end } = parseOpenWindow(openTime)
+  const startTs = toTimestamp(start)
+  const endTs = toTimestamp(end)
+  if (Number.isFinite(startTs) && Number.isFinite(endTs)) {
+    return now >= startTs && now <= endTs
+  }
+  if (Number.isFinite(endTs) && now > endTs) return false
+  if (Number.isFinite(startTs) && now < startTs) return false
   if (hasEnterLink) return true
-  const start = parseOpenStart(openTime)
-  if (!start) return false
-  const ts = Date.parse(start.replace(' ', 'T'))
-  return Number.isFinite(ts) && Date.now() >= ts
+  return Number.isFinite(startTs) && now >= startTs
 }
 
-module.exports = async function getProfileId(config) {
+async function getProfileId(config) {
   const rawCount = config.count === undefined || config.count === null ? '' : String(config.count).trim()
   const count = parseInt(rawCount, 10) || 1
   const requestedId = config.profileId ? String(config.profileId).trim() : ''
@@ -111,3 +121,7 @@ module.exports = async function getProfileId(config) {
 
   return config
 }
+
+module.exports = getProfileId
+module.exports.parseOpenWindow = parseOpenWindow
+module.exports.isOpenNow = isOpenNow

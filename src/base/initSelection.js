@@ -3,7 +3,14 @@ const { visit } = require('./tool')
 module.exports = async function initSelection(config) {
   const initUrl = `/eams/stdElectCourse!defaultPage.action?electionProfile.id=${config.profileId}`
 
-  const res = await visit(initUrl, config.cookie, config.request)
+  let res = ''
+  try {
+    res = await visit(initUrl, config.cookie, config.request)
+  } catch (error) {
+    config.electNotOpen = true
+    config.logger.sendData('log', `当前轮次未开放：${error.message || error}`)
+    return config
+  }
   if (!res) {
     throw new Error('选课初始化失败')
   }

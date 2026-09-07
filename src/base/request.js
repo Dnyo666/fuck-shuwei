@@ -6,6 +6,27 @@ function shouldPaceRequest(url) {
   return /stdElectCourse!batchOperator/i.test(String(url || ''))
 }
 
+function isElectUnavailableHtml(html) {
+  const text = String(html || '')
+  return /不在选课时间内/.test(text) || (/操作\s*失败/.test(text) && /选课/.test(text))
+}
+
+function shouldSkipLoginCheck(url) {
+  const path = String(url || '')
+  return /login(Ext|Page)?\.action/i.test(path) || /courseTableForStd/i.test(path) || /dataQuery\.action/i.test(path)
+}
+
+function isExpiredLoginHtml(html, requestUrl) {
+  if (typeof html !== 'string') return false
+  if (shouldSkipLoginCheck(requestUrl)) return false
+  if (isElectUnavailableHtml(html)) return false
+  const $ = cheerio.load(html)
+  const text = $('body').text()
+  const expired = text.includes('过期') && (text.includes('登录') || /name=["']username["']/.test(html))
+  const loginForm = /name=["']username["']/.test(html) && /name=["']password["']/.test(html)
+  return expired || loginForm
+}
+
 function createRequest({ url, delay, insecureTls }) {
   const instance = axios.create({
     baseURL: url,
@@ -28,14 +49,8 @@ function createRequest({ url, delay, insecureTls }) {
       try {
         const requestUrl = response.config.url || ''
         const html = response.data
-        if (typeof html === 'string') {
-          const $ = cheerio.load(html)
-          const text = $('body').text()
-          const expired = text.includes('过期') && (text.includes('登录') || /name=["']username["']/.test(html))
-          const loginForm = /name=["']username["']/.test(html) && /name=["']password["']/.test(html)
-          if (expired || loginForm) {
-            return Promise.reject(new Error('检测到登录过期...'))
-          }
+        if (isExpiredLoginHtml(html, requestUrl)) {
+          return Promise.reject(new Error('检测到登录过期...'))
         }
         if (shouldPaceRequest(requestUrl)) {
           return delayResponse(response)
@@ -77,4 +92,9 @@ function createRequest({ url, delay, insecureTls }) {
   return instance
 }
 
-module.exports = { createRequest, shouldPaceRequest }
+module.exports = {
+  createRequest,
+  shouldPaceRequest,
+  isElectUnavailableHtml,
+  isExpiredLoginHtml,
+}

@@ -86,7 +86,7 @@
               <div class="mt-4">
                 <TimetableGrid v-if="timetableActivities.length" :activities="timetableActivities" />
                 <div v-else class="py-10 text-center text-sm text-slate-500">
-                  还没有周课表。先点「拉取课表」，必修和实习才会进入占用。
+                  还没有周课表。先点「拉取课表」，已安排的课程才会进入占用。
                 </div>
               </div>
             </div>

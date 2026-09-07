@@ -170,7 +170,7 @@
             <n-tag size="small" :bordered="false" :type="activeProfile.open ? 'success' : 'warning'">
               {{ activeProfile.category || '选课' }}
             </n-tag>
-            <span class="ml-2">{{ activeProfile.open ? '已开放' : '未到开放时间' }}</span>
+            <span class="ml-2">{{ activeProfile.open ? '已开放' : '未开放' }}</span>
             <span v-if="activeProfile.openTime" class="ml-2">选课 {{ activeProfile.openTime }}</span>
             <div v-if="activeProfile.notice" class="mt-1">{{ activeProfile.notice }}</div>
           </div>
@@ -191,7 +191,7 @@
           <div class="mt-4">
             <TimetableGrid v-if="timetableActivities.length" :activities="timetableActivities" />
             <div v-else class="py-10 text-center text-sm text-slate-500">
-              还没有周课表。登录后点「拉取课表」，必修和已选选修会画在同一张表上。
+              还没有周课表。登录后点「拉取课表」，已安排的课程会画在同一张表上。
             </div>
           </div>
         </n-card>
@@ -346,7 +346,7 @@ const timetableActivities = computed(() => (
 ))
 
 const timetableHint = computed(() => {
-  if (!timetableActivities.value.length) return '官方 13 行周课表，含午休行'
+  if (!timetableActivities.value.length) return '来自教务「我的课表」，登录后即可拉取'
   return `共 ${timetableActivities.value.length} 段`
 })
 

@@ -84,8 +84,11 @@ const blocks = computed(() => {
         day: weekDay,
         start,
         end,
-        title: item.name || item.no || '课程',
-        subtitle: [item.teachers, item.place, item.weekLabel || periodRangeLabel(start, end)].filter(Boolean).join(' · '),
+        title: item.name && item.no ? `${item.name}(${item.no})` : (item.name || item.no || '课程'),
+        subtitle: [
+          item.teachers ? `(${item.teachers})` : '',
+          item.weekLabel || item.place ? `(${[item.weekLabel, item.place].filter(Boolean).join(',')})` : periodRangeLabel(start, end),
+        ].filter(Boolean).join(' '),
         kind: item.kind || item.source || '',
         hue,
       }

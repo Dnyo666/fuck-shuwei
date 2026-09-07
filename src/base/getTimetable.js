@@ -16,15 +16,33 @@ function inferKind(typeName, name) {
   return '其他'
 }
 
-function weekStateLabel(weekState) {
+function weekStateWeeks(weekState) {
   const s = String(weekState || '')
   const weeks = []
-  const max = Math.min(20, s.length - 1)
-  for (let i = 1; i <= max; i++) {
+  for (let i = 1; i < s.length; i++) {
     if (s[i] === '1') weeks.push(i)
   }
+  return weeks
+}
+
+function weekStateLabel(weekState) {
+  const weeks = weekStateWeeks(weekState)
   if (!weeks.length) return ''
-  return `第 ${weeks.join('、')} 周`
+  const min = weeks[0]
+  const max = weeks[weeks.length - 1]
+  const set = new Set(weeks)
+  const odd = []
+  const even = []
+  for (let i = min; i <= max; i++) {
+    if (i % 2) odd.push(i)
+    else even.push(i)
+  }
+  const allOdd = odd.length > 0 && odd.every((week) => set.has(week)) && even.every((week) => !set.has(week))
+  const allEven = even.length > 0 && even.every((week) => set.has(week)) && odd.every((week) => !set.has(week))
+  if (allOdd) return `单${min}-${max}`
+  if (allEven) return `双${min}-${max}`
+  if (weeks.length === max - min + 1) return `${min}-${max}`
+  return weeks.join(',')
 }
 
 function splitJsArgs(src) {
@@ -74,8 +92,8 @@ function parseCourseToken(raw) {
   return { name: text, no: '' }
 }
 
-function parseTeachersBlock(block) {
-  const match = String(block || '').match(/var\s+teachers\s*=\s*(\[[\s\S]*?\]);/)
+function namesFromTeachersLiteral(src) {
+  const match = String(src || '').match(/var\s+teachers\s*=\s*(\[[\s\S]*?\]);/)
   if (!match) return ''
   try {
     const list = new Function(`return ${match[1]}`)()
@@ -83,6 +101,20 @@ function parseTeachersBlock(block) {
   } catch {
     return ''
   }
+}
+
+function parseTeachersForActivity(html, activityIndex, afterBlock, teacherArg) {
+  const before = String(html || '').slice(0, activityIndex)
+  const last = [...before.matchAll(/var\s+teachers\s*=\s*(\[[\s\S]*?\]);/g)].pop()
+  if (last) {
+    const names = namesFromTeachersLiteral(`var teachers = ${last[1]};`)
+    if (names) return names
+  }
+  const after = namesFromTeachersLiteral(afterBlock)
+  if (after) return after
+  const raw = String(teacherArg || '').trim()
+  if (!raw || raw === 'null' || /join\(|actTeacher/i.test(raw)) return ''
+  return raw
 }
 
 function mergeUnitRows(rows) {
@@ -136,7 +168,7 @@ function parseCourseTableActivities(html) {
     const args = splitJsArgs(match[1])
     const course = parseCourseToken(args[2])
     const titled = parseCourseToken(args[3])
-    const teachers = parseTeachersBlock(match[2])
+    const teachers = parseTeachersForActivity(text, match.index, match[2], args[1])
     const place = args[5] && args[5] !== 'null' ? args[5] : ''
     const weekState = args[6] && args[6] !== 'null' ? args[6] : ''
     const name = titled.name || course.name || titled.no || course.no
@@ -159,24 +191,104 @@ function parseCourseTableActivities(html) {
   return mergeUnitRows(rows)
 }
 
+function firstCapture(text, patterns) {
+  for (const pattern of patterns) {
+    const match = String(text || '').match(pattern)
+    if (match && match[1]) return match[1]
+  }
+  return ''
+}
+
+function inferCurrentSchoolYear(now = new Date()) {
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  if (month >= 8) return { year: `${year}-${year + 1}`, term: '1' }
+  if (month <= 1) return { year: `${year - 1}-${year}`, term: '1' }
+  return { year: `${year - 1}-${year}`, term: '2' }
+}
+
 function parseCourseTableMeta(html) {
   const text = String(html || '')
-  const ids =
-    (text.match(/\bname=["']ids["'][^>]*\bvalue=["'](\d+)["']/) ||
-      text.match(/\bvalue=["'](\d+)["'][^>]*\bname=["']ids["']/) ||
-      text.match(/bg\.form\.addInput\([^)]*["']ids["']\s*,\s*["'](\d+)["']/) ||
-      text.match(/["']ids["']\s*,\s*["'](\d+)["']/) ||
-      text.match(/\bids\s*=\s*["'](\d+)["']/) ||
-      text.match(/\bstd(?:uent)?Ids?["']?\s*[:=]\s*["']?(\d+)/i) ||
-      [])[1] || ''
-  const semesterId =
-    (text.match(/\bname=["']semester\.id["'][^>]*\bvalue=["'](\d+)["']/) ||
-      text.match(/\bvalue=["'](\d+)["'][^>]*\bname=["']semester\.id["']/) ||
-      text.match(/semester\.id["']?\s*[:=]\s*["']?(\d+)/) ||
-      text.match(/dataType=semesterCalendar[^&]*&value=(\d+)/) ||
-      text.match(/semester\.id=(\d+)/) ||
-      [])[1] || ''
-  return { studentId: ids, semesterId }
+  const stdBlock = text.match(/val\(\)\s*==\s*["']std["']\s*\)\s*\{([\s\S]*?)\}\s*else/)
+  const stdIds = stdBlock && stdBlock[1].match(/["']ids["']\s*,\s*["'](\d+)["']/)
+  const studentId =
+    (stdIds && stdIds[1]) ||
+    firstCapture(text, [
+      /\bname=["']ids["'][^>]*\bvalue=["'](\d+)["']/,
+      /\bvalue=["'](\d+)["'][^>]*\bname=["']ids["']/,
+      /bg\.form\.addInput\([^)]*["']ids["']\s*,\s*["'](\d+)["']/,
+      /addInput\([^)]*["']ids["']\s*,\s*["'](\d+)["']/,
+      /["']ids["']\s*,\s*["'](\d+)["']/,
+      /\bids\s*=\s*["'](\d+)["']/,
+      /\bstd(?:uent)?Ids?["']?\s*[:=]\s*["']?(\d+)/i,
+      /name=["']ids["'][\s\S]{0,120}value=["'](\d+)["']/,
+    ])
+  const semesterId = firstCapture(text, [
+    /\bname=["']semester\.id["'][^>]*\bvalue=["'](\d+)["']/,
+    /\bvalue=["'](\d+)["'][^>]*\bname=["']semester\.id["']/,
+    /semester\.id["']?\s*[:=]\s*["']?(\d+)/,
+    /dataType=semesterCalendar[^&]*&value=(\d+)/,
+    /semester\.id=(\d+)/,
+    /semesterBar\s*\(\s*\{[\s\S]{0,400}\bvalue\s*:\s*["']?(\d+)/,
+    /semesterBar\s*\(\s*\{[\s\S]{0,400}\bdefaultValue\s*:\s*["']?(\d+)/,
+    /name=["']semester\.id["'][\s\S]{0,120}value=["'](\d+)["']/,
+  ])
+  return { studentId, semesterId }
+}
+
+function parseSemesterEntries(raw) {
+  const text = String(raw || '')
+  const entries = [...text.matchAll(/\{id:(\d+),schoolYear:"(\d{4}-\d{4})",name:"(\d+)"\}/g)].map((item) => ({
+    id: item[1],
+    year: item[2],
+    term: item[3],
+  }))
+  if (entries.length) return entries
+  return [...text.matchAll(/"id"\s*:\s*(\d+)[^}]*"schoolYear"\s*:\s*"(\d{4}-\d{4})"[^}]*"name"\s*:\s*"(\d+)"/g)].map((item) => ({
+    id: item[1],
+    year: item[2],
+    term: item[3],
+  }))
+}
+
+function parseSemesterCalendarId(raw, now = new Date()) {
+  const text = String(raw || '')
+  const explicit = (text.match(/semesterId\s*:\s*"(\d+)"/) || text.match(/"semesterId"\s*:\s*"(\d+)"/) || [])[1]
+  if (explicit) return explicit
+
+  const entries = parseSemesterEntries(text)
+  if (!entries.length) {
+    const yearTerm = (text.match(/"yearTerms"\s*:\s*\[\s*"([^"]+)"/) || [])[1] || ''
+    const parts = yearTerm.match(/^(\d{4}-\d{4})-(\d+)/)
+    if (parts) {
+      const ordered = text.match(new RegExp(`\\{[^}]*"id"\\s*:\\s*(\\d+)[^}]*"schoolYear"\\s*:\\s*"${parts[1]}"[^}]*"name"\\s*:\\s*"${parts[2]}"`))
+      if (ordered && ordered[1]) return ordered[1]
+    }
+    const ids = [...text.matchAll(/"id"\s*:\s*(\d+)/g)].map((item) => item[1])
+    return ids.length ? ids[ids.length - 1] : ''
+  }
+
+  const guessed = inferCurrentSchoolYear(now)
+  const current = entries.find((item) => item.year === guessed.year && item.term === guessed.term)
+  if (current) return current.id
+
+  const years = [...new Set(entries.map((item) => item.year))]
+  const yearIndex = Number((text.match(/yearIndex\s*:\s*"?(-?\d+)/) || [])[1])
+  const termIndex = Number((text.match(/termIndex\s*:\s*"?(-?\d+)/) || [])[1])
+  const year = Number.isFinite(yearIndex) && yearIndex >= 0 ? years[yearIndex] : years[years.length - 1]
+  const terms = entries.filter((item) => item.year === year)
+  const picked = Number.isFinite(termIndex) && termIndex >= 0 ? terms[termIndex] : terms[terms.length - 1]
+  return (picked && picked.id) || entries[entries.length - 1].id
+}
+
+function isElectUnavailablePage(html) {
+  const text = String(html || '')
+  return /不在选课时间内/.test(text) || (/操作\s*失败/.test(text) && /选课/.test(text))
+}
+
+function isLoginExpiredError(error) {
+  const text = error && error.message ? error.message : String(error || '')
+  return text.includes('登录过期')
 }
 
 function parseTimetableCourseList(html) {
@@ -329,20 +441,54 @@ function cachedTableMeta(config) {
   return { studentId: '', semesterId: '' }
 }
 
-async function fetchOfficialTimetable(config) {
-  let meta = cachedTableMeta(config)
-  if (!meta.studentId || !meta.semesterId) {
-    let index = await visit('/eams/courseTableForStd.action', config.cookie, config.request)
-    meta = parseCourseTableMeta(index)
-    if (!meta.studentId || !meta.semesterId) {
-      try {
-        index = await visit('/eams/courseTableForStd!innerIndex.action', config.cookie, config.request)
-        meta = parseCourseTableMeta(index)
-      } catch {
-        // keep the first parse
-      }
+const COURSE_TABLE_INDEX_PATHS = [
+  '/eams/courseTableForStd.action',
+  '/eams/courseTableForStd!innerIndex.action',
+  '/eams/courseTableForStd!innerIndex.action?project.id=1',
+  '/eams/courseTableForStd.action?project.id=1',
+]
+
+async function fetchCurrentSemesterId(config) {
+  const raw = await visitPost(
+    '/eams/dataQuery.action',
+    config.cookie,
+    config.request,
+    qs.stringify({
+      dataType: 'semesterCalendar',
+      tagId: 'semesterBar',
+      empty: 'false',
+    }),
+  )
+  return parseSemesterCalendarId(raw)
+}
+
+async function resolveTableMeta(config) {
+  const cached = cachedTableMeta(config)
+  if (cached.studentId && cached.semesterId) return cached
+
+  const merged = { studentId: cached.studentId || '', semesterId: cached.semesterId || '' }
+  for (const path of COURSE_TABLE_INDEX_PATHS) {
+    try {
+      const parsed = parseCourseTableMeta(await visit(path, config.cookie, config.request))
+      if (!merged.studentId && parsed.studentId) merged.studentId = parsed.studentId
+      if (!merged.semesterId && parsed.semesterId) merged.semesterId = parsed.semesterId
+      if (merged.studentId && merged.semesterId) return merged
+    } catch (error) {
+      if (isLoginExpiredError(error)) throw error
     }
   }
+  if (!merged.semesterId) {
+    try {
+      merged.semesterId = await fetchCurrentSemesterId(config)
+    } catch (error) {
+      if (isLoginExpiredError(error)) throw error
+    }
+  }
+  return merged
+}
+
+async function fetchOfficialTimetable(config) {
+  const meta = await resolveTableMeta(config)
   if (!meta.studentId || !meta.semesterId) {
     return { ...meta, activities: [], courses: [], source: 'empty' }
   }
@@ -377,11 +523,14 @@ async function fetchElectPageLessons(config, options = {}) {
   const wanted = Array.isArray(options.profileIds) && options.profileIds.length
     ? new Set(options.profileIds.map((id) => String(id)))
     : null
-  const pages = profiles.length ? profiles : [{ id: config.profileId, category: '', title: '' }]
+  const pages = profiles.length
+    ? profiles
+    : (config.profileId ? [{ id: config.profileId, category: '', title: '', open: true }] : [])
 
   for (const profile of pages) {
     if (!profile?.id) continue
     if (wanted && !wanted.has(String(profile.id))) continue
+    if (!wanted && profile.open === false) continue
     let page = ''
     try {
       page = await visit(
@@ -392,6 +541,7 @@ async function fetchElectPageLessons(config, options = {}) {
     } catch {
       continue
     }
+    if (!page || isElectUnavailablePage(page)) continue
 
     for (const lesson of extractJsArray(page, 'takedLessonsStr')) {
       collected.push(normalizeLesson(lesson, { category: '已修/已占', profileId: profile.id }))
@@ -461,27 +611,45 @@ async function startTimetableProcess(config, options = {}) {
       })
     }
     config = await getCookie(config)
-    if (!options.skipProfiles) {
-      try {
-        config = await getProfileId(config)
-      } catch (error) {
-        config.logger.sendData('log', `轮次列表未完全取到：${error.message || error}`)
-      }
-    }
 
     if (!config.quiet) {
       config.logger.sendData('log', options.skipProfiles ? '刷新当前课表' : '拉取我的课表')
     }
     const timetable = await fetchOfficialTimetable(config)
     if (!timetable.studentId || !timetable.semesterId) {
-      config.logger.sendData('log', '课表页没有解析到学期或学生 id，请确认当前会话仍已登录')
+      const miss = [!timetable.semesterId && '学期', !timetable.studentId && '学生课表参数'].filter(Boolean).join('、')
+      config.logger.sendData('log', `我的课表还缺少${miss}`)
+    } else if (!config.quiet) {
+      config.logger.sendData('log', `当前学期 ${timetable.semesterId}`)
     }
-    if (!config.quiet) {
-      config.logger.sendData('log', options.skipProfiles ? '核对已选课程' : '拉取已选课程（含必修、实习和已选选修）')
+
+    const refreshProfiles = options.refreshProfiles === true || options.skipProfiles === false
+    if (refreshProfiles) {
+      try {
+        config = await getProfileId(config)
+      } catch (error) {
+        config.logger.sendData('log', `选课轮次未取到，继续使用我的课表：${error.message || error}`)
+      }
     }
-    const electLessons = await fetchElectPageLessons(config, {
-      profileIds: options.profileIds,
-    })
+
+    let electLessons = []
+    if (!options.skipElect) {
+      if (!config.quiet) {
+        config.logger.sendData('log', options.skipProfiles ? '核对已选课程' : '如有开放轮次，补充已选选修')
+      }
+      try {
+        electLessons = await fetchElectPageLessons(config, {
+          profileIds: options.profileIds,
+        })
+      } catch (error) {
+        if (isLoginExpiredError(error)) {
+          config.logger.sendData('log', '选课页未能补充已选，已保留我的课表')
+        } else {
+          config.logger.sendData('log', `选课页补充未完成，已保留我的课表：${error.message || error}`)
+        }
+        electLessons = []
+      }
+    }
     let courses = mergeLessons([
       ...(timetable.courses || []).map((item) => normalizeLesson(item)),
       ...electLessons,
@@ -541,6 +709,10 @@ module.exports = {
   startTimetableProcess,
   parseCourseTableActivities,
   parseCourseTableMeta,
+  parseSemesterCalendarId,
+  inferCurrentSchoolYear,
+  isElectUnavailablePage,
+  weekStateLabel,
   activitiesFromLessons,
   inferKind,
   mergeLessons,
