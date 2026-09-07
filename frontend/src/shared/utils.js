@@ -1,3 +1,17 @@
+export function loginFailureLabel(raw) {
+  const text = String(raw || '').replace(/\s+/g, '')
+  if (!text) return '登录失败'
+  if (text.includes('验证码')) return '验证码不正确，请刷新图片后重新填写'
+  if (text.includes('密码错误') || text.includes('帐号或密码') || text.includes('账号或密码') || text.includes('用户名或密码')) {
+    return '学号或密码不正确'
+  }
+  if (text.includes('已锁定')) return '账号已锁定，请稍后再试或找回密码'
+  if (text.includes('教学管理信息系统') || text.includes('CourseManagement') || text.length > 80) {
+    return '登录失败，请核对学号、密码和验证码'
+  }
+  return String(raw || '登录失败')
+}
+
 export function nowId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }

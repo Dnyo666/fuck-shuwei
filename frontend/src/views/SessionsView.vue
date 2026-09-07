@@ -3,7 +3,7 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div class="text-xl font-semibold tracking-wide">会话</div>
-        <div class="mt-1 text-sm text-slate-600">每个学生一条独立会话，账密登录或导入 Cookie 后即可选课</div>
+        <div class="mt-1 text-sm text-slate-600">同一学号在同一教务地址下只保留一条会话；再次登录只更新凭证，待抢和排课配置会留下来</div>
       </div>
       <div class="flex items-center gap-2">
         <n-button secondary @click="openLogin()">账密登录</n-button>
@@ -58,7 +58,7 @@
       :block-scroll="false"
       style="width: 720px; max-width: 94vw"
     >
-      <div class="text-xs text-slate-600 -mt-2 mb-4">密码只用于本次登录，不会保存</div>
+      <div class="text-xs text-slate-600 -mt-2 mb-4">密码只用于本次登录，不会保存。同一学号再次登录只换凭证</div>
       <div class="space-y-4">
         <n-input v-model:value="store.loginDraft.url" placeholder="教务地址，例如 https://www.cduestc.cn" />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -128,7 +128,7 @@ import CaptchaPanel from '@/components/CaptchaPanel.vue'
 import { usePersistedStore } from '@/stores/persisted'
 import { useWsStore } from '@/stores/ws'
 import { useLogsStore } from '@/stores/logs'
-import { hostLabel, parseCookieInput } from '@/shared/utils'
+import { hostLabel, loginFailureLabel, parseCookieInput } from '@/shared/utils'
 
 function protocolLabel(url) {
   try {
@@ -221,7 +221,7 @@ async function submitLogin() {
     )
     const data = res.data || {}
     if (!data.ok) throw new Error(data.error || '登录失败')
-    store.addSession({
+    const saved = store.saveStudentSession({
       label: draft.username,
       username: draft.username,
       source: 'login',
@@ -229,12 +229,12 @@ async function submitLogin() {
       cookie: data.cookie,
       loginPath: data.loginPath || draft.loginPath,
     })
-    logs.pushLog('good', `已保存会话：${draft.username}`)
-    message.success('登录成功，会话已保存')
+    logs.pushLog('good', saved.reused ? `已更新会话凭证：${draft.username}` : `已保存会话：${draft.username}`)
+    message.success(saved.reused ? '登录成功，已更新当前学号的凭证' : '登录成功，会话已保存')
     loginOpen.value = false
     store.resetLoginDraft()
   } catch (error) {
-    const text = error?.response?.data?.error || error?.message || String(error)
+    const text = loginFailureLabel(error?.response?.data?.error || error?.message || String(error))
     logs.pushLog('error', `登录失败：${text}`)
     message.error(text)
   } finally {
@@ -262,7 +262,7 @@ async function submitImport() {
     const data = res.data || {}
     if (!data.ok) throw new Error(data.error || '导入失败')
     const username = String(form.username || '').trim()
-    store.addSession({
+    const saved = store.saveStudentSession({
       label: username || hostLabel(data.url || form.url),
       username,
       source: 'import',
@@ -272,9 +272,9 @@ async function submitImport() {
     if (data.urlChanged) {
       message.success(`Cookie 可用，地址已落到 ${data.url}`)
     } else {
-      message.success('Cookie 可用，会话已保存')
+      message.success(saved.reused ? 'Cookie 可用，已更新当前学号的凭证' : 'Cookie 可用，会话已保存')
     }
-    logs.pushLog('good', '已导入 Cookie 会话')
+    logs.pushLog('good', saved.reused ? `已更新会话凭证：${username}` : '已导入 Cookie 会话')
     importOpen.value = false
   } catch (error) {
     const text = error?.response?.data?.error || error?.message || String(error)

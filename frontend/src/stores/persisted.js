@@ -8,6 +8,7 @@ import {
   savePersistedState,
 } from '@/shared/persist'
 import { safeJsonParse } from '@/shared/utils'
+import { applyCredentialToSession, collapseSessionsByStudent, studentSessionKey } from '@/shared/sessionIdentity'
 
 function rawLessonCache(value) {
   return markRaw(value && typeof value === 'object' ? value : {})
@@ -115,29 +116,61 @@ export const usePersistedStore = defineStore('persisted', {
       const session = this.sessions.find((s) => s.id === id)
       if (session) session.lastUsedAt = Date.now()
     },
-    upsertSession(partial) {
-      const next = withRawLessonCache(createEmptySession(partial))
-      const idx = this.sessions.findIndex((s) => s.id === next.id)
-      if (idx >= 0) {
-        this.sessions[idx] = { ...this.sessions[idx], ...next, id: this.sessions[idx].id }
-        return this.sessions[idx]
+    collapseStudentSessions() {
+      const collapsed = collapseSessionsByStudent(this.sessions, this.activeSessionId)
+      this.sessions = collapsed.sessions.map((item) => withRawLessonCache(createEmptySession(item)))
+      this.activeSessionId = collapsed.activeSessionId || this.sessions[0]?.id || ''
+    },
+    saveStudentSession(partial) {
+      const incoming = createEmptySession({
+        ...partial,
+        lastUsedAt: Date.now(),
+      })
+      const key = studentSessionKey(incoming)
+      if (!key) {
+        const session = withRawLessonCache(
+          createEmptySession({
+            ...incoming,
+            id: undefined,
+            createdAt: Date.now(),
+            lastUsedAt: Date.now(),
+          }),
+        )
+        this.sessions.push(session)
+        this.activeSessionId = session.id
+        return { session, reused: false }
       }
-      this.sessions.push(next)
-      if (!this.activeSessionId) this.activeSessionId = next.id
-      return next
+      const matches = this.sessions.filter((item) => studentSessionKey(item) === key)
+      if (!matches.length) {
+        const session = withRawLessonCache(
+          createEmptySession({
+            ...incoming,
+            id: undefined,
+            createdAt: Date.now(),
+            lastUsedAt: Date.now(),
+          }),
+        )
+        this.sessions.push(session)
+        this.activeSessionId = session.id
+        return { session, reused: false }
+      }
+      const patched = this.sessions.map((item) => {
+        if (!matches.some((match) => match.id === item.id)) return item
+        return { ...applyCredentialToSession(item, incoming), id: item.id }
+      })
+      const collapsed = collapseSessionsByStudent(patched, matches[0].id)
+      this.sessions = collapsed.sessions.map((item) => withRawLessonCache(createEmptySession(item)))
+      this.activeSessionId = collapsed.activeSessionId || matches[0].id
+      return {
+        session: this.sessions.find((item) => item.id === this.activeSessionId) || this.sessions[0],
+        reused: true,
+      }
+    },
+    upsertSession(partial) {
+      return this.saveStudentSession(partial).session
     },
     addSession(partial) {
-      const session = withRawLessonCache(
-        createEmptySession({
-          ...partial,
-          id: undefined,
-          createdAt: Date.now(),
-          lastUsedAt: Date.now(),
-        }),
-      )
-      this.sessions.push(session)
-      this.activeSessionId = session.id
-      return session
+      return this.saveStudentSession(partial).session
     },
     updateSession(id, patch) {
       const idx = this.sessions.findIndex((s) => s.id === id)
@@ -149,7 +182,10 @@ export const usePersistedStore = defineStore('persisted', {
         lessonJSONsCache: patch.lessonJSONsCache || this.sessions[idx].lessonJSONsCache,
       })
       this.sessions[idx] = merged
-      return merged
+      if (patch && (patch.username != null || patch.url != null)) {
+        this.collapseStudentSessions()
+      }
+      return this.sessions.find((item) => item.id === id) || this.sessions.find((item) => item.id === this.activeSessionId) || null
     },
     removeSession(id) {
       this.sessions = this.sessions.filter((s) => s.id !== id)

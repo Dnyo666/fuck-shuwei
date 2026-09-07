@@ -93,20 +93,46 @@ async function submitPasswordLogin({
     },
   })
   const result = response.data.toString('utf-8')
-  const $ = cheerio.load(result)
-  $('script').remove()
-  $('style').remove()
-  const text = $('body').text().replace(/\s+/g, ' ').trim()
-  if (text.includes('验证码不正确')) {
-    throw new Error('验证码不正确，请刷新图片后重新填写')
-  }
-  if (text.includes('帐号或密码错误') || text.includes('用户名或密码')) {
-    throw new Error('帐号或密码错误')
-  }
-  if (text.includes('免听申请') || text.includes('退出') || !/name=["']username["']/.test(result)) {
+  const classified = classifyLoginResult(result)
+  if (classified.ok) {
     return { cookie, url: normalizeBaseUrl(url), loginPath: path }
   }
-  throw new Error(text || '登录失败')
+  throw new Error(classified.error)
+}
+
+function pageText(html) {
+  const $ = cheerio.load(String(html || ''))
+  $('script').remove()
+  $('style').remove()
+  return $('body').text().replace(/\s+/g, ' ').trim()
+}
+
+function compactText(text) {
+  return String(text || '').replace(/\s+/g, '')
+}
+
+function classifyLoginResult(html) {
+  const raw = String(html || '')
+  const text = pageText(raw)
+  const compact = compactText(text)
+  if (compact.includes('验证码不正确') || compact.includes('验证码错误')) {
+    return { ok: false, error: '验证码不正确，请刷新图片后重新填写' }
+  }
+  if (
+    compact.includes('密码错误') ||
+    compact.includes('帐号或密码错误') ||
+    compact.includes('账号或密码错误') ||
+    compact.includes('用户名或密码')
+  ) {
+    return { ok: false, error: '学号或密码不正确' }
+  }
+  if (compact.includes('账号已锁定') || compact.includes('帐号已锁定') || compact.includes('账户已锁定')) {
+    return { ok: false, error: '账号已锁定，请稍后再试或找回密码' }
+  }
+  if (compact.includes('免听申请') || compact.includes('退出') || !/name=["']username["']/.test(raw)) {
+    return { ok: true }
+  }
+  return { ok: false, error: '登录失败，请核对学号、密码和验证码' }
 }
 
 async function importCookieSession({ url, cookie, insecureTls }) {
@@ -122,4 +148,5 @@ module.exports = {
   refreshCaptchaImage,
   submitPasswordLogin,
   importCookieSession,
+  classifyLoginResult,
 }

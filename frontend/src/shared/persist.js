@@ -1,4 +1,5 @@
 import { nowId, safeJsonParse } from './utils'
+import { collapseSessionsByStudent } from './sessionIdentity'
 
 const STORAGE_KEY = 'modern-fe:state'
 
@@ -109,10 +110,14 @@ export function migrateLegacyState(raw) {
 export function normalizePersistedState(raw) {
   const input = raw && typeof raw === 'object' ? raw : {}
   if (Array.isArray(input.sessions)) {
-    const sessions = input.sessions.map((item) => createEmptySession(item))
+    const collapsed = collapseSessionsByStudent(
+      input.sessions.map((item) => createEmptySession(item)),
+      input.activeSessionId,
+    )
+    const sessions = collapsed.sessions.map((item) => createEmptySession(item))
     const activeSessionId =
-      typeof input.activeSessionId === 'string' && sessions.some((s) => s.id === input.activeSessionId)
-        ? input.activeSessionId
+      typeof collapsed.activeSessionId === 'string' && sessions.some((s) => s.id === collapsed.activeSessionId)
+        ? collapsed.activeSessionId
         : sessions[0]?.id || ''
     return {
       settings: normalizeSettings(input.settings || { delay: input.form?.delay }),
