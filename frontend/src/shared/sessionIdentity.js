@@ -5,7 +5,7 @@ export function normalizeStudentNo(value) {
 export function normalizeSchoolOrigin(url) {
   try {
     const parsed = new URL(String(url || '').trim())
-    return `${parsed.protocol}//${parsed.host}`.toLowerCase()
+    return parsed.host.toLowerCase()
   } catch {
     return String(url || '').trim().toLowerCase()
   }
@@ -56,7 +56,8 @@ function mergeLessonCaches(caches) {
     for (const [key, value] of Object.entries(cache)) {
       const incoming = Array.isArray(value) ? value : []
       const current = Array.isArray(out[key]) ? out[key] : []
-      if (incoming.length >= current.length) out[key] = incoming
+      if (incoming.length) out[key] = incoming
+      else if (!current.length) out[key] = incoming
     }
   }
   return out
@@ -104,13 +105,13 @@ export function mergeStudentSessionGroup(sessions) {
         ...rest.map((item) => item.scheduleInput && item.scheduleInput.lessonCodes),
       ]),
     },
-    schedulePrefs: first.schedulePrefs || latest.schedulePrefs,
-    selectionModel: first.selectionModel || latest.selectionModel,
-    courseCount: first.courseCount || latest.courseCount,
-    courseProfileId: first.courseProfileId || pickNonEmpty(rest, (item) => item.courseProfileId)?.courseProfileId || '',
-    scheduleCount: first.scheduleCount || latest.scheduleCount,
-    electionProfiles: pickNonEmpty(byCreated, (item) => Array.isArray(item.electionProfiles) && item.electionProfiles.length)?.electionProfiles || first.electionProfiles || [],
-    lessonJSONsCache: mergeLessonCaches(byCreated.map((item) => item.lessonJSONsCache)),
+    schedulePrefs: latest.schedulePrefs || first.schedulePrefs,
+    selectionModel: latest.selectionModel || first.selectionModel,
+    courseCount: latest.courseCount || first.courseCount,
+    courseProfileId: latest.courseProfileId || first.courseProfileId || pickNonEmpty(rest, (item) => item.courseProfileId)?.courseProfileId || '',
+    scheduleCount: latest.scheduleCount || first.scheduleCount,
+    electionProfiles: pickNonEmpty(byUsed, (item) => Array.isArray(item.electionProfiles) && item.electionProfiles.length)?.electionProfiles || first.electionProfiles || [],
+    lessonJSONsCache: mergeLessonCaches([...byUsed].reverse().map((item) => item.lessonJSONsCache)),
     yixuanData: uniqueStrings([first.yixuanData, ...rest.map((item) => item.yixuanData)]),
     electedLessons: mergeLessonRows(byCreated.map((item) => item.electedLessons)),
     timetable: pickTimetable(byCreated) || first.timetable,

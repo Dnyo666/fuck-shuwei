@@ -1,7 +1,9 @@
 export function loginFailureLabel(raw) {
   const text = String(raw || '').replace(/\s+/g, '')
   if (!text) return '登录失败'
-  if (text.includes('验证码')) return '验证码不正确，请刷新图片后重新填写'
+  if (text.includes('验证码不正确') || text.includes('验证码错误')) {
+    return '验证码不正确，请刷新图片后重新填写'
+  }
   if (text.includes('密码错误') || text.includes('帐号或密码') || text.includes('账号或密码') || text.includes('用户名或密码')) {
     return '学号或密码不正确'
   }

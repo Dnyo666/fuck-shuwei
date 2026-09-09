@@ -229,7 +229,7 @@ async function submitLogin() {
       cookie: data.cookie,
       loginPath: data.loginPath || draft.loginPath,
     })
-    logs.pushLog('good', saved.reused ? `已更新会话凭证：${draft.username}` : `已保存会话：${draft.username}`)
+    logs.pushLog('good', saved.reused ? '已更新会话凭证' : '已保存会话')
     message.success(saved.reused ? '登录成功，已更新当前学号的凭证' : '登录成功，会话已保存')
     loginOpen.value = false
     store.resetLoginDraft()
@@ -274,7 +274,7 @@ async function submitImport() {
     } else {
       message.success(saved.reused ? 'Cookie 可用，已更新当前学号的凭证' : 'Cookie 可用，会话已保存')
     }
-    logs.pushLog('good', saved.reused ? `已更新会话凭证：${username}` : '已导入 Cookie 会话')
+    logs.pushLog('good', saved.reused ? '已更新会话凭证' : '已导入 Cookie 会话')
     importOpen.value = false
   } catch (error) {
     const text = error?.response?.data?.error || error?.message || String(error)

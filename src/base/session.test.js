@@ -36,3 +36,30 @@ test('classifyLoginResult treats home page as success', () => {
   const result = classifyLoginResult('<body>免听申请 退出</body>')
   assert.equal(result.ok, true)
 })
+
+test('classifyLoginResult treats official post-login redirect as success', () => {
+  const result = classifyLoginResult('<html><script>window.location="/eams/homeExt.action"</script></html>')
+  assert.equal(result.ok, true)
+})
+
+test('classifyLoginResult reads 密码错误 from script alert', () => {
+  const result = classifyLoginResult('<body><script>alert("密码错误")</script><input name="username"/><input name="password"/></body>')
+  assert.equal(result.ok, false)
+  assert.equal(result.error, '学号或密码不正确')
+})
+
+test('classifyLoginResult reads 验证码不正确 from script alert', () => {
+  const result = classifyLoginResult('<body><script>alert("验证码不正确")</script><input name="username"/><input name="password"/></body>')
+  assert.equal(result.ok, false)
+  assert.equal(result.error.includes('验证码'), true)
+})
+
+test('classifyLoginResult fails on empty body', () => {
+  assert.equal(classifyLoginResult('').ok, false)
+})
+
+test('classifyLoginResult treats leftover login form as failure', () => {
+  const result = classifyLoginResult('<body>请重新登录<input name="username"/><input name="password"/></body>')
+  assert.equal(result.ok, false)
+  assert.equal(result.error, '登录失败，请核对学号、密码和验证码')
+})

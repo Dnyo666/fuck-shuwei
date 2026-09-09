@@ -111,10 +111,21 @@ function compactText(text) {
   return String(text || '').replace(/\s+/g, '')
 }
 
+function scriptAlertText(html) {
+  const raw = String(html || '')
+  const messages = []
+  const pattern = /alert\s*\(\s*(['"])([\s\S]*?)\1\s*\)/g
+  let match = pattern.exec(raw)
+  while (match) {
+    messages.push(match[2])
+    match = pattern.exec(raw)
+  }
+  return messages.join(' ')
+}
+
 function classifyLoginResult(html) {
   const raw = String(html || '')
-  const text = pageText(raw)
-  const compact = compactText(text)
+  const compact = compactText(`${pageText(raw)}\n${scriptAlertText(raw)}`)
   if (compact.includes('验证码不正确') || compact.includes('验证码错误')) {
     return { ok: false, error: '验证码不正确，请刷新图片后重新填写' }
   }
@@ -128,6 +139,9 @@ function classifyLoginResult(html) {
   }
   if (compact.includes('账号已锁定') || compact.includes('帐号已锁定') || compact.includes('账户已锁定')) {
     return { ok: false, error: '账号已锁定，请稍后再试或找回密码' }
+  }
+  if (!raw.trim()) {
+    return { ok: false, error: '登录失败，请核对学号、密码和验证码' }
   }
   if (compact.includes('免听申请') || compact.includes('退出') || !/name=["']username["']/.test(raw)) {
     return { ok: true }
